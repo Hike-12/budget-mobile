@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useState, useEffect } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import Colors from '../constants/colors';
 
@@ -8,11 +8,14 @@ const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 const categories = ['school friends', 'college friends', 'religion', 'personal', 'miscellaneous'];
 
 export default function AddTransactionScreen() {
-  const [title, setTitle] = useState('');
-  const [amount, setAmount] = useState('');
-  const [type, setType] = useState('expense');
-  const [category, setCategory] = useState('miscellaneous');
-  const [note, setNote] = useState('');
+  const params = useLocalSearchParams();
+  const isEdit = params.edit === 'true';
+
+  const [title, setTitle] = useState(params.title || '');
+  const [amount, setAmount] = useState(params.amount ? String(params.amount) : '');
+  const [type, setType] = useState(params.type || 'expense');
+  const [category, setCategory] = useState(params.category || 'miscellaneous');
+  const [note, setNote] = useState(params.note || '');
   const router = useRouter();
 
   async function handleSubmit() {
@@ -21,66 +24,62 @@ export default function AddTransactionScreen() {
       return;
     }
     try {
-      await axios.post(`${API_URL}/api/budgets`, {
-        title,
-        amount: Number(amount),
-        type,
-        category,
-        note,
-        createdAt: new Date(),
-      });
+      if (isEdit && params._id) {
+        await axios.patch(`${API_URL}/api/budgets`, {
+          id: params._id,
+          title,
+          amount: Number(amount),
+          type,
+          category,
+          note,
+        });
+      } else {
+        await axios.post(`${API_URL}/api/budgets`, {
+          title,
+          amount: Number(amount),
+          type,
+          category,
+          note,
+          createdAt: new Date(),
+        });
+      }
       router.replace('/dashboard');
     } catch (error) {
-      Alert.alert('Error', 'Failed to add transaction');
+      Alert.alert('Error', isEdit ? 'Failed to edit transaction' : 'Failed to add transaction');
     }
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
-      <Text style={styles.label}>Title</Text>
-      <TextInput style={styles.input} placeholder="Enter title" placeholderTextColor={Colors.secondary} value={title} onChangeText={setTitle} />
-      
-      <Text style={styles.label}>Amount</Text>
-      <TextInput style={styles.input} placeholder="Enter amount" placeholderTextColor={Colors.secondary} keyboardType="numeric" value={amount} onChangeText={setAmount} />
-      
-      <Text style={styles.label}>Type</Text>
-      <View style={styles.typeContainer}>
-        <TouchableOpacity
-          style={[styles.typeButton, type === 'expense' && styles.typeButtonActive]}
-          onPress={() => setType('expense')}
-        >
-          <Text style={[styles.typeText, type === 'expense' && styles.typeTextActive]}>Expense</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.typeButton, type === 'income' && styles.typeButtonActive]}
-          onPress={() => setType('income')}
-        >
-          <Text style={[styles.typeText, type === 'income' && styles.typeTextActive]}>Income</Text>
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.label}>Category</Text>
-      <View style={styles.categoryContainer}>
-        {categories.map(cat => (
-          <TouchableOpacity
-            key={cat}
-            style={[styles.categoryButton, category === cat && styles.categoryButtonActive]}
-            onPress={() => setCategory(cat)}
-          >
-            <Text style={[styles.categoryText, category === cat && styles.categoryTextActive]}>
-              {cat.charAt(0).toUpperCase() + cat.slice(1)}
-            </Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}>
+      <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
+        <Text style={styles.label}>Title</Text>
+        <TextInput style={styles.input} placeholder="Enter title" placeholderTextColor={Colors.secondary} value={title} onChangeText={setTitle} />
+        <Text style={styles.label}>Amount</Text>
+        <TextInput style={styles.input} placeholder="Enter amount" placeholderTextColor={Colors.secondary} keyboardType="numeric" value={amount} onChangeText={setAmount} />
+        <Text style={styles.label}>Type</Text>
+        <View style={styles.typeContainer}>
+          <TouchableOpacity style={[styles.typeButton, type === 'expense' && styles.typeButtonActive]} onPress={() => setType('expense')}>
+            <Text style={[styles.typeText, type === 'expense' && styles.typeTextActive]}>Expense</Text>
           </TouchableOpacity>
-        ))}
-      </View>
-
-      <Text style={styles.label}>Note (Optional)</Text>
-      <TextInput style={[styles.input, styles.textArea]} placeholder="Add a note" placeholderTextColor={Colors.secondary} multiline numberOfLines={3} value={note} onChangeText={setNote} />
-      
-      <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-        <Text style={styles.submitButtonText}>Add Transaction</Text>
-      </TouchableOpacity>
-    </ScrollView>
+          <TouchableOpacity style={[styles.typeButton, type === 'income' && styles.typeButtonActive]} onPress={() => setType('income')}>
+            <Text style={[styles.typeText, type === 'income' && styles.typeTextActive]}>Income</Text>
+          </TouchableOpacity>
+        </View>
+        <Text style={styles.label}>Category</Text>
+        <View style={styles.categoryContainer}>
+          {categories.map(cat => (
+            <TouchableOpacity key={cat} style={[styles.categoryButton, category === cat && styles.categoryButtonActive]} onPress={() => setCategory(cat)}>
+              <Text style={[styles.categoryText, category === cat && styles.categoryTextActive]}>{cat.charAt(0).toUpperCase() + cat.slice(1)}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        <Text style={styles.label}>Note (Optional)</Text>
+        <TextInput style={[styles.input, styles.textArea]} placeholder="Add a note" placeholderTextColor={Colors.secondary} multiline numberOfLines={3} value={note} onChangeText={setNote} />
+        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+          <Text style={styles.submitButtonText}>{isEdit ? 'Save Changes' : 'Add Transaction'}</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
