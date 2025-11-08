@@ -3,6 +3,7 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, KeyboardAvo
 import { useRouter } from 'expo-router';
 import axios from 'axios';
 import Colors from '../constants/colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 
@@ -15,6 +16,7 @@ export default function LoginScreen() {
     try {
       const res = await axios.post(`${API_URL}/api/login`, { username, password });
       if (res.data.success) {
+        await AsyncStorage.setItem('username', username); // Save username
         router.replace('/dashboard');
       } else {
         Alert.alert('Error', 'Invalid credentials');

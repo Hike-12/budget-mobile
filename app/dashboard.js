@@ -6,6 +6,7 @@ import Colors from '../constants/colors';
 import BudgetCard from '../components/BudgetCard';
 import TotalBalance from '../components/TotalBalance';
 import FilterBar from '../components/FilterBar';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 
@@ -24,7 +25,9 @@ export default function DashboardScreen() {
 
   async function fetchBudgets() {
     try {
-      const res = await axios.get(`${API_URL}/api/budgets`);
+      const user = await AsyncStorage.getItem('username');
+      if (!user) return;
+      const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
       setBudgets(res.data);
     } catch (e) {}
   }
@@ -35,7 +38,9 @@ export default function DashboardScreen() {
 
   async function handleDelete(id) {
     try {
-      await axios.delete(`${API_URL}/api/budgets`, { data: { id } });
+      const user = await AsyncStorage.getItem('username');
+      if (!user) return;
+      await axios.delete(`${API_URL}/api/budgets`, { data: { id, user } });
       fetchBudgets();
     } catch (e) {}
   }

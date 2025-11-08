@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import axios from 'axios';
 import Colors from '../constants/colors';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 const categories = ['school friends', 'college friends', 'religion', 'personal', 'miscellaneous'];
@@ -24,6 +25,11 @@ export default function AddTransactionScreen() {
       return;
     }
     try {
+      const user = await AsyncStorage.getItem('username'); // Get username
+      if (!user) {
+        Alert.alert('Error', 'User not found. Please login again.');
+        return;
+      }
       if (isEdit && params._id) {
         await axios.patch(`${API_URL}/api/budgets`, {
           id: params._id,
@@ -32,6 +38,7 @@ export default function AddTransactionScreen() {
           type,
           category,
           note,
+          user, // Send user
         });
       } else {
         await axios.post(`${API_URL}/api/budgets`, {
@@ -41,6 +48,7 @@ export default function AddTransactionScreen() {
           category,
           note,
           createdAt: new Date(),
+          user, // Send user
         });
       }
       router.replace('/dashboard');
@@ -50,7 +58,7 @@ export default function AddTransactionScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={80}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 30 }}>
         <Text style={styles.label}>Title</Text>
         <TextInput style={styles.input} placeholder="Enter title" placeholderTextColor={Colors.secondary} value={title} onChangeText={setTitle} />
