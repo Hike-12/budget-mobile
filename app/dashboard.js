@@ -17,7 +17,7 @@ export default function DashboardScreen() {
   // Filter states
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('All');
-  const [filterMonth, setFilterMonth] = useState('0'); // 0 = All
+  const [filterMonth, setFilterMonth] = useState('0');
   const [filterYear, setFilterYear] = useState(new Date().getFullYear().toString());
   const [filterRange, setFilterRange] = useState('all');
 
@@ -58,13 +58,8 @@ export default function DashboardScreen() {
   // Filtering logic (like web)
   const filteredBudgets = useMemo(() => {
     let arr = [...budgets];
-    if (filterType !== 'all') {
-      arr = arr.filter(b => b.type === filterType);
-    }
-    if (filterCategory !== 'All') {
-      arr = arr.filter(b => b.category === filterCategory);
-    }
-    // Month/year
+    if (filterType !== 'all') arr = arr.filter(b => b.type === filterType);
+    if (filterCategory !== 'All') arr = arr.filter(b => b.category === filterCategory);
     if (filterMonth !== '0' || filterYear !== new Date().getFullYear().toString()) {
       arr = arr.filter(b => {
         const d = new Date(b.createdAt);
@@ -73,7 +68,6 @@ export default function DashboardScreen() {
         return monthMatch && yearMatch;
       });
     }
-    // Range
     if (filterRange !== 'all') {
       const now = new Date();
       arr = arr.filter(b => {
