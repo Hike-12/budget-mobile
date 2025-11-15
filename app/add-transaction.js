@@ -27,31 +27,48 @@ export default function AddTransactionScreen() {
     }
     try {
       const user = await AsyncStorage.getItem('username');
-      const budgetId = Date.now().toString();
+      
+      // Use existing _id if editing, otherwise create new unique one
+      const budgetId = isEdit && params._id ? params._id : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      
       const budget = {
         title,
         amount: Number(amount),
         type,
         category,
         note,
-        createdAt: new Date(),
+        createdAt: isEdit && params.createdAt ? params.createdAt : new Date().toISOString(),
         user,
         _id: budgetId
       };
       
       // Save locally
       const localBudgets = await AsyncStorage.getItem('budgets');
-      const budgetsArr = localBudgets ? JSON.parse(localBudgets) : [];
-      budgetsArr.push(budget);
+      let budgetsArr = localBudgets ? JSON.parse(localBudgets) : [];
+      
+      if (isEdit) {
+        // Update existing budget
+        budgetsArr = budgetsArr.map(b => b._id === budgetId ? budget : b);
+      } else {
+        // Add new budget
+        budgetsArr.push(budget);
+      }
+      
       await AsyncStorage.setItem('budgets', JSON.stringify(budgetsArr));
       
       // Add to unsynced queue ONLY if not already there
       const queue = await AsyncStorage.getItem('unsynced');
       const unsynced = queue ? JSON.parse(queue) : [];
-      const alreadyQueued = unsynced.some(item => item.budget && item.budget._id === budgetId);
+      const alreadyQueued = unsynced.some(item => {
+        if (isEdit) {
+          return item.action === 'edit' && item.budget && item.budget._id === budgetId;
+        } else {
+          return item.action === 'add' && item.budget && item.budget._id === budgetId;
+        }
+      });
       
       if (!alreadyQueued) {
-        unsynced.push({ action: 'add', budget });
+        unsynced.push({ action: isEdit ? 'edit' : 'add', budget });
         await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
       }
       
@@ -63,7 +80,7 @@ export default function AddTransactionScreen() {
       
       router.replace('/dashboard');
     } catch (error) {
-      Alert.alert('Error', 'Failed to add transaction');
+      Alert.alert('Error', isEdit ? 'Failed to edit transaction' : 'Failed to add transaction');
     }
   }
 
@@ -77,7 +94,7 @@ export default function AddTransactionScreen() {
       let success = false;
       try {
         if (change.action === 'add') {
-          // Check if already exists on server
+          // Check if already exists on server by _id
           const checkRes = await axios.get(`${API_URL}/api/budgets?user=${user}`);
           const exists = checkRes.data.some(b => b._id === change.budget._id);
           if (!exists) {

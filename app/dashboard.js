@@ -61,75 +61,94 @@ export default function DashboardScreen() {
   }
 
   async function addToUnsyncedQueue(change) {
-  const queue = await AsyncStorage.getItem('unsynced');
-  const unsynced = queue ? JSON.parse(queue) : [];
-  
-  // Check if this change is already in the queue
-  const alreadyExists = unsynced.some(item => {
-    if (change.action === 'add' && item.action === 'add') {
-      return item.budget._id === change.budget._id;
+    const queue = await AsyncStorage.getItem('unsynced');
+    const unsynced = queue ? JSON.parse(queue) : [];
+    
+    // Check if this change is already in the queue
+    const alreadyExists = unsynced.some(item => {
+      if (change.action === 'add' && item.action === 'add') {
+        return item.budget && change.budget && item.budget._id === change.budget._id;
+      }
+      if (change.action === 'delete' && item.action === 'delete') {
+        return item.id === change.id;
+      }
+      if (change.action === 'edit' && item.action === 'edit') {
+        return item.budget && change.budget && item.budget._id === change.budget._id;
+      }
+      return false;
+    });
+    
+    if (!alreadyExists) {
+      unsynced.push(change);
+      await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
     }
-    if (change.action === 'delete' && item.action === 'delete') {
-      return item.id === change.id;
-    }
-    if (change.action === 'edit' && item.action === 'edit') {
-      return item.budget._id === change.budget._id;
-    }
-    return false;
-  });
-  
-  if (!alreadyExists) {
-    unsynced.push(change);
-    await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
   }
-}
 
   // Sync with server when online
-async function syncWithServer() {
-  const user = await AsyncStorage.getItem('username');
-  let queue = await AsyncStorage.getItem('unsynced');
-  let unsynced = queue ? JSON.parse(queue) : [];
-  let newQueue = [];
-  for (const change of unsynced) {
-    let success = false;
-    try {
-      if (change.action === 'add') {
-        // Prevent duplicate add by checking if already exists on server
-        const checkRes = await axios.get(`${API_URL}/api/budgets?user=${user}`);
-        const exists = checkRes.data.some(b => b._id === change.budget._id);
-        if (!exists) {
-          await axios.post(`${API_URL}/api/budgets`, { ...change.budget, user });
+  async function syncWithServer() {
+    const user = await AsyncStorage.getItem('username');
+    let queue = await AsyncStorage.getItem('unsynced');
+    let unsynced = queue ? JSON.parse(queue) : [];
+    let newQueue = [];
+    
+    for (const change of unsynced) {
+      let success = false;
+      try {
+        if (change.action === 'add') {
+          // Check if already exists on server
+          const checkRes = await axios.get(`${API_URL}/api/budgets?user=${user}`);
+          const exists = checkRes.data.some(b => b._id === change.budget._id);
+          if (!exists) {
+            await axios.post(`${API_URL}/api/budgets`, { ...change.budget, user });
+          }
+          success = true;
+        } else if (change.action === 'delete') {
+          await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, user } });
+          success = true;
+        } else if (change.action === 'edit') {
+          await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, user, id: change.budget._id });
+          success = true;
         }
-        success = true;
-      } else if (change.action === 'delete') {
-        await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, user } });
-        success = true;
-      } else if (change.action === 'edit') {
-        await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, user, id: change.budget._id });
-        success = true;
+      } catch (e) {
+        success = false;
       }
-    } catch (e) {
-      // If failed, keep in queue
-      success = false;
+      
+      if (!success) newQueue.push(change);
     }
-    if (!success) newQueue.push(change);
+    
+    await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
+    
+    // Fetch latest from server and update local
+    try {
+      const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
+      await AsyncStorage.setItem('budgets', JSON.stringify(res.data));
+      setBudgets(res.data);
+    } catch (e) {}
   }
-  await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
-  // Fetch latest from server and update local
-  try {
-    const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
-    await AsyncStorage.setItem('budgets', JSON.stringify(res.data));
-    setBudgets(res.data);
-  } catch (e) {}
-}
 
   function handleEdit(budget) {
-    router.push({ pathname: '/add-transaction', params: { edit: 'true', ...budget } });
+    router.push({ 
+      pathname: '/add-transaction', 
+      params: { 
+        edit: 'true', 
+        _id: budget._id,
+        title: budget.title,
+        amount: budget.amount.toString(),
+        type: budget.type,
+        category: budget.category,
+        note: budget.note || '',
+        createdAt: budget.createdAt
+      } 
+    });
   }
 
   async function onRefresh() {
     setRefreshing(true);
-    await loadBudgetsLocal();
+    if (isOnline) {
+      await syncWithServer();
+    } else {
+      await loadBudgetsLocal();
+    }
     setRefreshing(false);
   }
 
