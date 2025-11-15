@@ -61,30 +61,60 @@ export default function DashboardScreen() {
   }
 
   async function addToUnsyncedQueue(change) {
-    const queue = await AsyncStorage.getItem('unsynced');
-    const unsynced = queue ? JSON.parse(queue) : [];
+  const queue = await AsyncStorage.getItem('unsynced');
+  const unsynced = queue ? JSON.parse(queue) : [];
+  
+  // Check if this change is already in the queue
+  const alreadyExists = unsynced.some(item => {
+    if (change.action === 'add' && item.action === 'add') {
+      return item.budget._id === change.budget._id;
+    }
+    if (change.action === 'delete' && item.action === 'delete') {
+      return item.id === change.id;
+    }
+    if (change.action === 'edit' && item.action === 'edit') {
+      return item.budget._id === change.budget._id;
+    }
+    return false;
+  });
+  
+  if (!alreadyExists) {
     unsynced.push(change);
     await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
   }
+}
 
   // Sync with server when online
 async function syncWithServer() {
   const user = await AsyncStorage.getItem('username');
-  const queue = await AsyncStorage.getItem('unsynced');
-  const unsynced = queue ? JSON.parse(queue) : [];
+  let queue = await AsyncStorage.getItem('unsynced');
+  let unsynced = queue ? JSON.parse(queue) : [];
+  let newQueue = [];
   for (const change of unsynced) {
+    let success = false;
     try {
       if (change.action === 'add') {
-        await axios.post(`${API_URL}/api/budgets`, { ...change.budget, user });
+        // Prevent duplicate add by checking if already exists on server
+        const checkRes = await axios.get(`${API_URL}/api/budgets?user=${user}`);
+        const exists = checkRes.data.some(b => b._id === change.budget._id);
+        if (!exists) {
+          await axios.post(`${API_URL}/api/budgets`, { ...change.budget, user });
+        }
+        success = true;
       } else if (change.action === 'delete') {
         await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, user } });
+        success = true;
       } else if (change.action === 'edit') {
         await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, user, id: change.budget._id });
+        success = true;
       }
-    } catch (e) {}
+    } catch (e) {
+      // If failed, keep in queue
+      success = false;
+    }
+    if (!success) newQueue.push(change);
   }
-  // After syncing, clear unsynced queue
-  await AsyncStorage.setItem('unsynced', JSON.stringify([]));
+  await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
   // Fetch latest from server and update local
   try {
     const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);

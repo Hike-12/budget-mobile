@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import axios from 'axios';
 import Colors from '../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 
+const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 const categories = ['school friends', 'college friends', 'religion', 'personal', 'miscellaneous'];
 
 export default function AddTransactionScreen() {
@@ -18,29 +20,6 @@ export default function AddTransactionScreen() {
   const [note, setNote] = useState(params.note || '');
   const router = useRouter();
 
-  // Import syncWithServer from dashboard.js
-  async function syncWithServer() {
-    const user = await AsyncStorage.getItem('username');
-    const queue = await AsyncStorage.getItem('unsynced');
-    const unsynced = queue ? JSON.parse(queue) : [];
-    for (const change of unsynced) {
-      try {
-        if (change.action === 'add') {
-          await axios.post(`https://budget-tracker-aliqyaan.vercel.app/api/budgets`, { ...change.budget, user });
-        } else if (change.action === 'delete') {
-          await axios.delete(`https://budget-tracker-aliqyaan.vercel.app/api/budgets`, { data: { id: change.id, user } });
-        } else if (change.action === 'edit') {
-          await axios.patch(`https://budget-tracker-aliqyaan.vercel.app/api/budgets`, { ...change.budget, user, id: change.budget._id });
-        }
-      } catch (e) {}
-    }
-    await AsyncStorage.setItem('unsynced', JSON.stringify([]));
-    try {
-      const res = await axios.get(`https://budget-tracker-aliqyaan.vercel.app/api/budgets?user=${user}`);
-      await AsyncStorage.setItem('budgets', JSON.stringify(res.data));
-    } catch (e) {}
-  }
-
   async function handleSubmit() {
     if (!title || !amount) {
       Alert.alert('Error', 'Please fill all required fields');
@@ -48,6 +27,7 @@ export default function AddTransactionScreen() {
     }
     try {
       const user = await AsyncStorage.getItem('username');
+      const budgetId = Date.now().toString();
       const budget = {
         title,
         amount: Number(amount),
@@ -56,27 +36,75 @@ export default function AddTransactionScreen() {
         note,
         createdAt: new Date(),
         user,
-        _id: Date.now().toString()
+        _id: budgetId
       };
+      
       // Save locally
       const localBudgets = await AsyncStorage.getItem('budgets');
       const budgetsArr = localBudgets ? JSON.parse(localBudgets) : [];
       budgetsArr.push(budget);
       await AsyncStorage.setItem('budgets', JSON.stringify(budgetsArr));
-      // Add to unsynced queue
+      
+      // Add to unsynced queue ONLY if not already there
       const queue = await AsyncStorage.getItem('unsynced');
       const unsynced = queue ? JSON.parse(queue) : [];
-      unsynced.push({ action: 'add', budget });
-      await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
-      // If online, sync
+      const alreadyQueued = unsynced.some(item => item.budget && item.budget._id === budgetId);
+      
+      if (!alreadyQueued) {
+        unsynced.push({ action: 'add', budget });
+        await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
+      }
+      
+      // If online, sync immediately
       const netState = await NetInfo.fetch();
       if (netState.isConnected) {
         await syncWithServer();
       }
+      
       router.replace('/dashboard');
     } catch (error) {
-      Alert.alert('Error', isEdit ? 'Failed to edit transaction' : 'Failed to add transaction');
+      Alert.alert('Error', 'Failed to add transaction');
     }
+  }
+
+  async function syncWithServer() {
+    const user = await AsyncStorage.getItem('username');
+    let queue = await AsyncStorage.getItem('unsynced');
+    let unsynced = queue ? JSON.parse(queue) : [];
+    let newQueue = [];
+    
+    for (const change of unsynced) {
+      let success = false;
+      try {
+        if (change.action === 'add') {
+          // Check if already exists on server
+          const checkRes = await axios.get(`${API_URL}/api/budgets?user=${user}`);
+          const exists = checkRes.data.some(b => b._id === change.budget._id);
+          if (!exists) {
+            await axios.post(`${API_URL}/api/budgets`, { ...change.budget, user });
+          }
+          success = true;
+        } else if (change.action === 'delete') {
+          await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, user } });
+          success = true;
+        } else if (change.action === 'edit') {
+          await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, user, id: change.budget._id });
+          success = true;
+        }
+      } catch (e) {
+        success = false;
+      }
+      
+      if (!success) newQueue.push(change);
+    }
+    
+    await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
+    
+    // Fetch latest from server and update local
+    try {
+      const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
+      await AsyncStorage.setItem('budgets', JSON.stringify(res.data));
+    } catch (e) {}
   }
 
   return (

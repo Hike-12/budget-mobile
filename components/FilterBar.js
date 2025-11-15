@@ -31,7 +31,6 @@ export default function FilterBar({
 }) {
   const [open, setOpen] = useState(false);
 
-  // Check if any filter is active
   const hasActiveFilters =
     filterType !== 'all' ||
     filterCategory !== 'All' ||
@@ -61,7 +60,7 @@ export default function FilterBar({
         )}
       </TouchableOpacity>
       {open && (
-        <ScrollView horizontal={false} style={styles.filtersScroll} contentContainerStyle={{ paddingBottom: 10 }}>
+        <View style={styles.filtersContainer}>
           {/* Type */}
           <Text style={styles.groupLabel}>Type</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
@@ -75,6 +74,7 @@ export default function FilterBar({
               </TouchableOpacity>
             ))}
           </ScrollView>
+          
           {/* Category */}
           <Text style={styles.groupLabel}>Category</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
@@ -90,6 +90,7 @@ export default function FilterBar({
               </TouchableOpacity>
             ))}
           </ScrollView>
+          
           {/* Range */}
           <Text style={styles.groupLabel}>Range</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
@@ -103,6 +104,7 @@ export default function FilterBar({
               </TouchableOpacity>
             ))}
           </ScrollView>
+          
           {/* Month */}
           <Text style={styles.groupLabel}>Month</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
@@ -116,6 +118,7 @@ export default function FilterBar({
               </TouchableOpacity>
             ))}
           </ScrollView>
+          
           {/* Year */}
           <Text style={styles.groupLabel}>Year</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
@@ -129,13 +132,14 @@ export default function FilterBar({
               </TouchableOpacity>
             ))}
           </ScrollView>
+          
           {/* Clear Filters */}
           {hasActiveFilters && (
             <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
               <Text style={styles.clearText}>Clear Filters</Text>
             </TouchableOpacity>
           )}
-        </ScrollView>
+        </View>
       )}
     </View>
   );
@@ -147,7 +151,7 @@ const styles = StyleSheet.create({
   toggleButtonActive: { backgroundColor: Colors.secondary },
   toggleText: { color: Colors.accent, fontWeight: 'bold', fontSize: 14 },
   activeDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary, marginLeft: 8 },
-  filtersScroll: { maxHeight: 320 },
+  filtersContainer: { paddingBottom: 10 },
   groupLabel: { color: Colors.accent, fontWeight: '600', fontSize: 12, marginVertical: 4, marginLeft: 2 },
   groupScroll: { marginBottom: 8 },
   button: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.primary + '20', borderColor: Colors.secondary, borderWidth: 1, marginRight: 8, marginBottom: 4 },
