@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import axios from 'axios';
 import Colors from '../constants/colors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NetInfo from '@react-native-community/netinfo';
 
 const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 
@@ -13,16 +14,33 @@ export default function LoginScreen() {
   const router = useRouter();
 
   async function handleLogin() {
-    try {
-      const res = await axios.post(`${API_URL}/api/login`, { username, password });
-      if (res.data.success) {
-        await AsyncStorage.setItem('username', username); // Save username
+    const netState = await NetInfo.fetch();
+    if (netState.isConnected) {
+      // Online: normal login
+      try {
+        const res = await axios.post(`${API_URL}/api/login`, { username, password });
+        if (res.data.success) {
+          await AsyncStorage.setItem('username', username);
+          await AsyncStorage.setItem('password', password); // Save password for offline login
+          // Fetch budgets and save locally for offline
+          const budgetsRes = await axios.get(`${API_URL}/api/budgets?user=${username}`);
+          await AsyncStorage.setItem('budgets', JSON.stringify(budgetsRes.data));
+          router.replace('/dashboard');
+        } else {
+          Alert.alert('Error', 'Invalid credentials');
+        }
+      } catch (error) {
+        Alert.alert('Error', 'Login failed');
+      }
+    } else {
+      // Offline: check local credentials
+      const savedUsername = await AsyncStorage.getItem('username');
+      const savedPassword = await AsyncStorage.getItem('password');
+      if (username === savedUsername && password === savedPassword) {
         router.replace('/dashboard');
       } else {
-        Alert.alert('Error', 'Invalid credentials');
+        Alert.alert('Error', 'Offline login failed. Please login online at least once.');
       }
-    } catch (error) {
-      Alert.alert('Error', 'Login failed');
     }
   }
 
