@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useRef, useState, useEffect, useMemo } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import axios from 'axios';
@@ -15,8 +15,8 @@ export default function DashboardScreen() {
   const [budgets, setBudgets] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const syncingRef = useRef(false);
 
-  // Filter states
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterMonth, setFilterMonth] = useState('0');
@@ -25,34 +25,26 @@ export default function DashboardScreen() {
 
   const router = useRouter();
 
-  // Detect online/offline
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
       setIsOnline(state.isConnected);
-      if (state.isConnected) {
-        syncWithServer();
-      }
+      if (state.isConnected) syncWithServer();
     });
     return () => unsubscribe();
   }, []);
 
-  // Load budgets from local storage on mount
-  useEffect(() => {
-    loadBudgetsLocal();
-  }, []);
+  useEffect(() => { loadBudgetsLocal(); }, []);
 
   async function loadBudgetsLocal() {
     const localBudgets = await AsyncStorage.getItem('budgets');
     setBudgets(localBudgets ? JSON.parse(localBudgets) : []);
   }
 
-  // Save budgets to local storage
   async function saveBudgetsLocal(newBudgets) {
     setBudgets(newBudgets);
     await AsyncStorage.setItem('budgets', JSON.stringify(newBudgets));
   }
 
-  // Add, edit, delete: update local storage and add to unsynced queue
   async function handleDelete(id) {
     const newBudgets = budgets.filter(b => b._id !== id);
     await saveBudgetsLocal(newBudgets);
@@ -63,74 +55,88 @@ export default function DashboardScreen() {
   async function addToUnsyncedQueue(change) {
     const queue = await AsyncStorage.getItem('unsynced');
     const unsynced = queue ? JSON.parse(queue) : [];
-    
-    // Check if this change is already in the queue
     const alreadyExists = unsynced.some(item => {
-      if (change.action === 'add' && item.action === 'add') {
-        return item.budget && change.budget && item.budget._id === change.budget._id;
-      }
-      if (change.action === 'delete' && item.action === 'delete') {
-        return item.id === change.id;
-      }
-      if (change.action === 'edit' && item.action === 'edit') {
-        return item.budget && change.budget && item.budget._id === change.budget._id;
-      }
+      if (change.action === 'add' && item.action === 'add') return item.budget?._id === change.budget?._id;
+      if (change.action === 'delete' && item.action === 'delete') return item.id === change.id;
+      if (change.action === 'edit' && item.action === 'edit') return item.budget?._id === change.budget?._id;
       return false;
     });
-    
     if (!alreadyExists) {
       unsynced.push(change);
       await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
     }
   }
 
-  // Sync with server when online
   async function syncWithServer() {
-    const user = await AsyncStorage.getItem('username');
-    let queue = await AsyncStorage.getItem('unsynced');
-    let unsynced = queue ? JSON.parse(queue) : [];
-    let newQueue = [];
-    
-    for (const change of unsynced) {
-      let success = false;
-      try {
-        if (change.action === 'add') {
-          // Check if already exists on server
-          const checkRes = await axios.get(`${API_URL}/api/budgets?user=${user}`);
-          const exists = checkRes.data.some(b => b._id === change.budget._id);
-          if (!exists) {
-            await axios.post(`${API_URL}/api/budgets`, { ...change.budget, user });
-          }
-          success = true;
-        } else if (change.action === 'delete') {
-          await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, user } });
-          success = true;
-        } else if (change.action === 'edit') {
-          await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, user, id: change.budget._id });
-          success = true;
-        }
-      } catch (e) {
-        success = false;
-      }
-      
-      if (!success) newQueue.push(change);
-    }
-    
-    await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
-    
-    // Fetch latest from server and update local
+    if (syncingRef.current) return;
+    syncingRef.current = true;
     try {
+      const user = await AsyncStorage.getItem('username');
+      let queue = await AsyncStorage.getItem('unsynced');
+      let unsynced = queue ? JSON.parse(queue) : [];
+
+      // Keep only the latest change per clientId/id
+      const map = new Map();
+      for (let i = unsynced.length - 1; i >= 0; i--) {
+        const c = unsynced[i];
+        const key = c.action === 'delete' ? c.id : c.budget?._id;
+        if (!map.has(key)) map.set(key, c);
+      }
+      unsynced = Array.from(map.values()).reverse();
+
+      // Pull latest once
+      const serverList = (await axios.get(`${API_URL}/api/budgets?user=${user}`)).data || [];
+      const serverByClientId = new Set(serverList.filter(b => b.clientId).map(b => b.clientId));
+
+      const newQueue = [];
+      for (const change of unsynced) {
+        let success = false;
+        try {
+          if (change.action === 'add') {
+            const clientId = change.budget._id;
+            if (!serverByClientId.has(clientId)) {
+              await axios.post(`${API_URL}/api/budgets`, {
+                ...change.budget,
+                clientId: clientId,
+                user,
+              });
+              serverByClientId.add(clientId);
+            }
+            success = true;
+          } else if (change.action === 'edit') {
+            const clientId = change.budget._id;
+            await axios.patch(`${API_URL}/api/budgets`, {
+              ...change.budget,
+              clientId,
+              user,
+              id: change.budget._id, // server PATCH handles id or clientId
+            });
+            success = true;
+          } else if (change.action === 'delete') {
+            await axios.delete(`${API_URL}/api/budgets`, {
+              data: { id: change.id, clientId: change.id, user },
+            });
+            success = true;
+          }
+        } catch (e) {
+          success = false;
+        }
+        if (!success) newQueue.push(change);
+      }
+
+      await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
       const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
-      await AsyncStorage.setItem('budgets', JSON.stringify(res.data));
-      setBudgets(res.data);
-    } catch (e) {}
+      await saveBudgetsLocal(res.data);
+    } finally {
+      syncingRef.current = false;
+    }
   }
 
   function handleEdit(budget) {
-    router.push({ 
-      pathname: '/add-transaction', 
-      params: { 
-        edit: 'true', 
+    router.push({
+      pathname: '/add-transaction',
+      params: {
+        edit: 'true',
         _id: budget._id,
         title: budget.title,
         amount: budget.amount.toString(),
@@ -138,21 +144,17 @@ export default function DashboardScreen() {
         category: budget.category,
         note: budget.note || '',
         createdAt: budget.createdAt
-      } 
+      }
     });
   }
 
   async function onRefresh() {
     setRefreshing(true);
-    if (isOnline) {
-      await syncWithServer();
-    } else {
-      await loadBudgetsLocal();
-    }
+    if (isOnline) await syncWithServer();
+    else await loadBudgetsLocal();
     setRefreshing(false);
   }
 
-  // Filtering logic (like web)
   const filteredBudgets = useMemo(() => {
     let arr = [...budgets];
     if (filterType !== 'all') arr = arr.filter(b => b.type === filterType);
@@ -170,16 +172,11 @@ export default function DashboardScreen() {
       arr = arr.filter(b => {
         const d = new Date(b.createdAt);
         if (filterRange === 'week') {
-          const weekAgo = new Date(now);
-          weekAgo.setDate(now.getDate() - 7);
+          const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
           return d >= weekAgo && d <= now;
         }
-        if (filterRange === 'month') {
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        }
-        if (filterRange === 'year') {
-          return d.getFullYear() === now.getFullYear();
-        }
+        if (filterRange === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+        if (filterRange === 'year') return d.getFullYear() === now.getFullYear();
         return true;
       });
     }
@@ -205,22 +202,14 @@ export default function DashboardScreen() {
         filterRange={filterRange}
         setFilterRange={setFilterRange}
       />
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => router.push('/add-transaction')}
-      >
+      <TouchableOpacity style={styles.addButton} onPress={() => router.push('/add-transaction')}>
         <Text style={styles.addButtonText}>+ Add Transaction</Text>
       </TouchableOpacity>
       {filteredBudgets.length === 0 ? (
         <Text style={{ color: Colors.secondary, textAlign: 'center', marginTop: 40 }}>No transactions found.</Text>
       ) : (
         filteredBudgets.map(item => (
-          <BudgetCard
-            key={item._id}
-            budget={item}
-            onDelete={handleDelete}
-            onEdit={handleEdit}
-          />
+          <BudgetCard key={item._id} budget={item} onDelete={handleDelete} onEdit={handleEdit} />
         ))
       )}
     </ScrollView>

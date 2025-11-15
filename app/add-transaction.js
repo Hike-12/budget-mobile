@@ -84,45 +84,52 @@ export default function AddTransactionScreen() {
     }
   }
 
-  async function syncWithServer() {
-    const user = await AsyncStorage.getItem('username');
-    let queue = await AsyncStorage.getItem('unsynced');
-    let unsynced = queue ? JSON.parse(queue) : [];
-    let newQueue = [];
-    
-    for (const change of unsynced) {
-      let success = false;
-      try {
-        if (change.action === 'add') {
-          // Check if already exists on server by _id
-          const checkRes = await axios.get(`${API_URL}/api/budgets?user=${user}`);
-          const exists = checkRes.data.some(b => b._id === change.budget._id);
-          if (!exists) {
-            await axios.post(`${API_URL}/api/budgets`, { ...change.budget, user });
-          }
-          success = true;
-        } else if (change.action === 'delete') {
-          await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, user } });
-          success = true;
-        } else if (change.action === 'edit') {
-          await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, user, id: change.budget._id });
-          success = true;
-        }
-      } catch (e) {
-        success = false;
-      }
-      
-      if (!success) newQueue.push(change);
-    }
-    
-    await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
-    
-    // Fetch latest from server and update local
-    try {
-      const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
-      await AsyncStorage.setItem('budgets', JSON.stringify(res.data));
-    } catch (e) {}
+async function syncWithServer() {
+  const user = await AsyncStorage.getItem('username');
+  let queue = await AsyncStorage.getItem('unsynced');
+  let unsynced = queue ? JSON.parse(queue) : [];
+  let newQueue = [];
+
+  // compact queue (latest per clientId)
+  const map = new Map();
+  for (let i = unsynced.length - 1; i >= 0; i--) {
+    const c = unsynced[i];
+    const key = c.action === 'delete' ? c.id : c.budget?._id;
+    if (!map.has(key)) map.set(key, c);
   }
+  unsynced = Array.from(map.values()).reverse();
+
+  // pull list once
+  const serverList = (await axios.get(`${API_URL}/api/budgets?user=${user}`)).data || [];
+  const serverByClientId = new Set(serverList.filter(b => b.clientId).map(b => b.clientId));
+
+  for (const change of unsynced) {
+    let success = false;
+    try {
+      if (change.action === 'add') {
+        const clientId = change.budget._id;
+        if (!serverByClientId.has(clientId)) {
+          await axios.post(`${API_URL}/api/budgets`, { ...change.budget, clientId, user });
+          serverByClientId.add(clientId);
+        }
+        success = true;
+      } else if (change.action === 'edit') {
+        const clientId = change.budget._id;
+        await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, clientId, user, id: clientId });
+        success = true;
+      } else if (change.action === 'delete') {
+        await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, clientId: change.id, user } });
+        success = true;
+      }
+    } catch {
+      success = false;
+    }
+    if (!success) newQueue.push(change);
+  }
+  await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
+  const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
+  await AsyncStorage.setItem('budgets', JSON.stringify(res.data));
+}
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
