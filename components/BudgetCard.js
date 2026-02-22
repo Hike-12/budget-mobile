@@ -1,8 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import DeleteModal from './DeleteModal';
+
+// Pre-compute date format options once (avoids object allocation per render)
+const DATE_FORMAT_OPTIONS = { day: 'numeric', month: 'short', year: 'numeric' };
 
 const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) {
   const [modalVisible, setModalVisible] = useState(false);
@@ -16,18 +19,37 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
     onEdit(budget);
   }, [budget, onEdit]);
 
+  const openModal = useCallback(() => setModalVisible(true), []);
+  const closeModal = useCallback(() => setModalVisible(false), []);
+
   const isIncome = budget.type === 'income';
   const { privacyMode } = usePrivacy();
+
   const displayAmount = privacyMode
     ? `${isIncome ? '+' : '-'}••••`
     : `${isIncome ? '+' : '-'}₹${budget.amount.toLocaleString('en-IN')}`;
+
+  // Memoize the formatted date string — avoids Date construction + toLocaleDateString per render
+  const formattedDate = useMemo(
+    () => new Date(budget.createdAt).toLocaleDateString('en-IN', DATE_FORMAT_OPTIONS),
+    [budget.createdAt]
+  );
+
+  // Memoize capitalized category
+  const displayCategory = useMemo(
+    () => budget.category.charAt(0).toUpperCase() + budget.category.slice(1),
+    [budget.category]
+  );
+
+  const amountColor = isIncome ? Colors.green : Colors.red;
+  const badgeBg = amountColor + '20';
 
   return (
     <View style={styles.card}>
       <DeleteModal
         visible={modalVisible}
         title={budget.title}
-        onCancel={() => setModalVisible(false)}
+        onCancel={closeModal}
         onDelete={handleDelete}
       />
       <View style={styles.header}>
@@ -36,28 +58,20 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
           <TouchableOpacity onPress={handleEdit} hitSlop={8} activeOpacity={0.7}>
             <Text style={styles.editButton}>Edit</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => setModalVisible(true)} hitSlop={8} activeOpacity={0.7}>
+          <TouchableOpacity onPress={openModal} hitSlop={8} activeOpacity={0.7}>
             <Text style={styles.deleteButton}>Delete</Text>
           </TouchableOpacity>
         </View>
       </View>
-      <Text style={[styles.amount, { color: isIncome ? Colors.green : Colors.red }]}>
+      <Text style={[styles.amount, { color: amountColor }]}>
         {displayAmount}
       </Text>
-      <Text style={styles.category}>
-        {budget.category.charAt(0).toUpperCase() + budget.category.slice(1)}
-      </Text>
+      <Text style={styles.category}>{displayCategory}</Text>
       {budget.note ? <Text style={styles.note}>{budget.note}</Text> : null}
       <View style={styles.footer}>
-        <Text style={styles.date}>
-          {new Date(budget.createdAt).toLocaleDateString('en-IN', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })}
-        </Text>
-        <View style={[styles.typeBadge, { backgroundColor: isIncome ? Colors.green + '20' : Colors.red + '20' }]}>
-          <Text style={[styles.type, { color: isIncome ? Colors.green : Colors.red }]}>
+        <Text style={styles.date}>{formattedDate}</Text>
+        <View style={[styles.typeBadge, { backgroundColor: badgeBg }]}>
+          <Text style={[styles.type, { color: amountColor }]}>
             {budget.type.toUpperCase()}
           </Text>
         </View>

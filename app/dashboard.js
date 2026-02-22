@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import axios from 'axios';
 import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -18,15 +17,15 @@ import BudgetCard from '../components/BudgetCard';
 import FilterBar from '../components/FilterBar';
 import { Toast } from '../components/Toast';
 import TotalBalance from '../components/TotalBalance';
+import { PAGE_SIZE } from '../constants/api';
 import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
-
-const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
-const PAGE_SIZE = 15;
+import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
 
 export default function DashboardScreen() {
   const [budgets, setBudgets] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const isOnlineRef = useRef(true);
   const [isOnline, setIsOnline] = useState(true);
   const syncingRef = useRef(false);
 
@@ -41,110 +40,58 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { privacyMode, togglePrivacy } = usePrivacy();
 
+  // Keep ref in sync to avoid stale closures in NetInfo listener
+  useEffect(() => {
+    isOnlineRef.current = isOnline;
+  }, [isOnline]);
+
   // --- Network & data loading ---
+
+  const doSync = useCallback(async () => {
+    if (syncingRef.current) return;
+    syncingRef.current = true;
+    try {
+      const result = await syncWithServer();
+      if (result) setBudgets(result);
+    } finally {
+      syncingRef.current = false;
+    }
+  }, []);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
-      const wasOffline = !isOnline;
+      const wasOffline = !isOnlineRef.current;
       setIsOnline(state.isConnected);
       if (state.isConnected) {
         if (wasOffline) Toast.show({ message: 'Back online. Syncing...', type: 'info' });
-        syncWithServer();
+        doSync();
       }
     });
-    return () => unsubscribe();
-  }, [isOnline]);
+    return unsubscribe;
+  }, [doSync]);
 
   useEffect(() => {
     loadBudgetsLocal();
   }, []);
 
   const loadBudgetsLocal = useCallback(async () => {
-    const localBudgets = await AsyncStorage.getItem('budgets');
-    setBudgets(localBudgets ? JSON.parse(localBudgets) : []);
-  }, []);
-
-  const saveBudgetsLocal = useCallback(async (newBudgets) => {
-    setBudgets(newBudgets);
-    await AsyncStorage.setItem('budgets', JSON.stringify(newBudgets));
+    const raw = await AsyncStorage.getItem('budgets');
+    setBudgets(raw ? JSON.parse(raw) : []);
   }, []);
 
   const handleDelete = useCallback(async (id) => {
-    setBudgets(prev => {
-      const updated = prev.filter(b => b._id !== id);
-      AsyncStorage.setItem('budgets', JSON.stringify(updated));
-      return updated;
-    });
+    setBudgets(prev => prev.filter(b => b._id !== id));
+    // Persist outside the state updater to avoid async-in-updater anti-pattern
+    const raw = await AsyncStorage.getItem('budgets');
+    const all = raw ? JSON.parse(raw) : [];
+    await AsyncStorage.setItem('budgets', JSON.stringify(all.filter(b => b._id !== id)));
+
     Toast.show({ message: 'Transaction deleted.', type: 'success' });
     await addToUnsyncedQueue({ action: 'delete', id });
+
     const netState = await NetInfo.fetch();
-    if (netState.isConnected) syncWithServer();
-  }, []);
-
-  const addToUnsyncedQueue = useCallback(async (change) => {
-    const queue = await AsyncStorage.getItem('unsynced');
-    const unsynced = queue ? JSON.parse(queue) : [];
-    const alreadyExists = unsynced.some(item => {
-      if (change.action === 'add' && item.action === 'add') return item.budget?._id === change.budget?._id;
-      if (change.action === 'delete' && item.action === 'delete') return item.id === change.id;
-      if (change.action === 'edit' && item.action === 'edit') return item.budget?._id === change.budget?._id;
-      return false;
-    });
-    if (!alreadyExists) {
-      unsynced.push(change);
-      await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
-    }
-  }, []);
-
-  const syncWithServer = useCallback(async () => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-    try {
-      const user = await AsyncStorage.getItem('username');
-      let queue = await AsyncStorage.getItem('unsynced');
-      let unsynced = queue ? JSON.parse(queue) : [];
-
-      const map = new Map();
-      for (let i = unsynced.length - 1; i >= 0; i--) {
-        const c = unsynced[i];
-        const key = c.action === 'delete' ? c.id : c.budget?._id;
-        if (!map.has(key)) map.set(key, c);
-      }
-      unsynced = Array.from(map.values()).reverse();
-
-      const serverList = (await axios.get(`${API_URL}/api/budgets?user=${user}`)).data || [];
-      const serverByClientId = new Set(serverList.filter(b => b.clientId).map(b => b.clientId));
-
-      const newQueue = [];
-      for (const change of unsynced) {
-        let success = false;
-        try {
-          if (change.action === 'add') {
-            const clientId = change.budget._id;
-            if (!serverByClientId.has(clientId)) {
-              await axios.post(`${API_URL}/api/budgets`, { ...change.budget, clientId, user });
-              serverByClientId.add(clientId);
-            }
-            success = true;
-          } else if (change.action === 'edit') {
-            const clientId = change.budget._id;
-            await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, clientId, user, id: change.budget._id });
-            success = true;
-          } else if (change.action === 'delete') {
-            await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, clientId: change.id, user } });
-            success = true;
-          }
-        } catch { success = false; }
-        if (!success) newQueue.push(change);
-      }
-
-      await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
-      const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
-      await saveBudgetsLocal(res.data);
-    } finally {
-      syncingRef.current = false;
-    }
-  }, [saveBudgetsLocal]);
+    if (netState.isConnected) doSync();
+  }, [doSync]);
 
   const handleEdit = useCallback((budget) => {
     router.push({
@@ -164,15 +111,15 @@ export default function DashboardScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (isOnline) await syncWithServer();
+    if (isOnlineRef.current) await doSync();
     else await loadBudgetsLocal();
     setRefreshing(false);
-  }, [isOnline, syncWithServer, loadBudgetsLocal]);
+  }, [doSync, loadBudgetsLocal]);
 
   // --- Filtering & Search ---
 
   const filteredBudgets = useMemo(() => {
-    let arr = [...budgets];
+    let arr = budgets;
 
     // Search
     if (searchQuery.trim()) {
@@ -200,15 +147,16 @@ export default function DashboardScreen() {
 
     if (filterRange !== 'all') {
       const now = new Date();
+      const nowTime = now.getTime();
+      const weekAgoTime = nowTime - 7 * 24 * 60 * 60 * 1000;
+      const curMonth = now.getMonth();
+      const curYear = now.getFullYear();
+
       arr = arr.filter(b => {
         const d = new Date(b.createdAt);
-        if (filterRange === 'week') {
-          const weekAgo = new Date(now);
-          weekAgo.setDate(now.getDate() - 7);
-          return d >= weekAgo && d <= now;
-        }
-        if (filterRange === 'month') return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
-        if (filterRange === 'year') return d.getFullYear() === now.getFullYear();
+        if (filterRange === 'week') return d.getTime() >= weekAgoTime && d.getTime() <= nowTime;
+        if (filterRange === 'month') return d.getMonth() === curMonth && d.getFullYear() === curYear;
+        if (filterRange === 'year') return d.getFullYear() === curYear;
         return true;
       });
     }
@@ -240,6 +188,9 @@ export default function DashboardScreen() {
   ), [handleDelete, handleEdit]);
 
   const keyExtractor = useCallback((item) => item._id, []);
+
+  // Decouple the count from the header to avoid re-creating the entire header JSX
+  const filteredCount = filteredBudgets.length;
 
   const listHeader = useMemo(() => (
     <>
@@ -293,21 +244,21 @@ export default function DashboardScreen() {
         />
       </View>
 
-      {filteredBudgets.length > 0 && (
+      {filteredCount > 0 && (
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Transactions</Text>
-          <Text style={styles.sectionCount}>{filteredBudgets.length}</Text>
+          <Text style={styles.sectionCount}>{filteredCount}</Text>
         </View>
       )}
     </>
-  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, router]);
+  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router]);
 
   const listFooter = useMemo(() => {
-    if (filteredBudgets.length === 0) return null;
+    if (filteredCount === 0) return null;
     return (
       <View style={styles.paginationContainer}>
         <Text style={styles.pageInfo}>
-          Showing {Math.min(paginatedBudgets.length, filteredBudgets.length)} of {filteredBudgets.length}
+          Showing {Math.min(paginatedBudgets.length, filteredCount)} of {filteredCount}
         </Text>
         {hasMore && (
           <TouchableOpacity style={styles.loadMoreButton} onPress={loadMore} activeOpacity={0.8}>
@@ -316,7 +267,7 @@ export default function DashboardScreen() {
         )}
       </View>
     );
-  }, [filteredBudgets.length, paginatedBudgets.length, hasMore, loadMore]);
+  }, [filteredCount, paginatedBudgets.length, hasMore, loadMore]);
 
   const listEmpty = useCallback(() => (
     <View style={styles.emptyContainer}>
@@ -368,8 +319,9 @@ export default function DashboardScreen() {
         showsVerticalScrollIndicator={false}
         removeClippedSubviews={Platform.OS === 'android'}
         maxToRenderPerBatch={10}
-        windowSize={7}
+        windowSize={5}
         initialNumToRender={PAGE_SIZE}
+        updateCellsBatchingPeriod={50}
       />
     </>
   );
@@ -429,10 +381,10 @@ const styles = StyleSheet.create({
   addButtonText: {
     color: Colors.dark,
     fontWeight: '600',
-    fontSize: 15, // Slightly smaller to ensure fit
+    fontSize: 15,
     textAlign: 'center',
     width: '100%',
-    paddingHorizontal: 40, // Avoid overlap with absolute icon
+    paddingHorizontal: 40,
   },
   sectionHeader: {
     flexDirection: 'row',

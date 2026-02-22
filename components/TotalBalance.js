@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
@@ -8,9 +8,16 @@ const MASKED = '••••••';
 const TotalBalance = React.memo(function TotalBalance({ budgets }) {
   const { privacyMode } = usePrivacy();
 
-  const income = budgets.reduce((acc, b) => (b.type === 'income' ? acc + b.amount : acc), 0);
-  const expense = budgets.reduce((acc, b) => (b.type === 'expense' ? acc + b.amount : acc), 0);
-  const total = income - expense;
+  // Memoize the calculation — single pass instead of two separate reduces
+  const { income, expense, total } = useMemo(() => {
+    let inc = 0;
+    let exp = 0;
+    for (let i = 0; i < budgets.length; i++) {
+      if (budgets[i].type === 'income') inc += budgets[i].amount;
+      else exp += budgets[i].amount;
+    }
+    return { income: inc, expense: exp, total: inc - exp };
+  }, [budgets]);
 
   const mask = (val) =>
     privacyMode ? MASKED : `₹${val.toLocaleString('en-IN')}`;

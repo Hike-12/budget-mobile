@@ -1,6 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import axios from 'axios';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
@@ -16,10 +15,9 @@ import {
 } from 'react-native';
 import { Toast } from '../components/Toast';
 import Colors from '../constants/colors';
+import { syncWithServer } from '../utils/sync';
 
-const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 const categories = ['school friends', 'college friends', 'religion', 'personal', 'miscellaneous'];
-
 
 export default function AddTransactionScreen() {
   const params = useLocalSearchParams();
@@ -30,23 +28,22 @@ export default function AddTransactionScreen() {
   const [type, setType] = useState(params.type || 'expense');
   const [category, setCategory] = useState(params.category || 'miscellaneous');
   const [note, setNote] = useState(params.note || '');
-  const [stage, setStage] = useState(false);
+  const [loading, setLoading] = useState(false);
   const router = useRouter();
-
-  const loading = stage;
 
   const handleSubmit = useCallback(async () => {
     if (!title.trim() || !amount.trim()) {
       Toast.show({ message: 'Please fill in title and amount.', type: 'warning' });
       return;
     }
-    if (isNaN(Number(amount)) || Number(amount) <= 0) {
+    const numAmount = Number(amount);
+    if (isNaN(numAmount) || numAmount <= 0) {
       Toast.show({ message: 'Please enter a valid amount.', type: 'warning' });
       return;
     }
 
     try {
-      setStage(true);
+      setLoading(true);
       const user = await AsyncStorage.getItem('username');
       const budgetId = isEdit && params._id
         ? params._id
@@ -54,7 +51,7 @@ export default function AddTransactionScreen() {
 
       const budget = {
         title: title.trim(),
-        amount: Number(amount),
+        amount: numAmount,
         type,
         category,
         note: note.trim(),
@@ -63,8 +60,9 @@ export default function AddTransactionScreen() {
         _id: budgetId,
       };
 
-      const localBudgets = await AsyncStorage.getItem('budgets');
-      let budgetsArr = localBudgets ? JSON.parse(localBudgets) : [];
+      // Update local storage
+      const raw = await AsyncStorage.getItem('budgets');
+      let budgetsArr = raw ? JSON.parse(raw) : [];
 
       if (isEdit) {
         budgetsArr = budgetsArr.map(b => b._id === budgetId ? budget : b);
@@ -73,20 +71,22 @@ export default function AddTransactionScreen() {
       }
       await AsyncStorage.setItem('budgets', JSON.stringify(budgetsArr));
 
-      const queue = await AsyncStorage.getItem('unsynced');
-      const unsynced = queue ? JSON.parse(queue) : [];
-      const alreadyQueued = unsynced.some(item => {
-        if (isEdit) return item.action === 'edit' && item.budget?._id === budgetId;
-        return item.action === 'add' && item.budget?._id === budgetId;
-      });
+      // Queue for sync
+      const queueRaw = await AsyncStorage.getItem('unsynced');
+      const unsynced = queueRaw ? JSON.parse(queueRaw) : [];
+      const action = isEdit ? 'edit' : 'add';
+      const alreadyQueued = unsynced.some(item =>
+        item.action === action && item.budget?._id === budgetId
+      );
       if (!alreadyQueued) {
-        unsynced.push({ action: isEdit ? 'edit' : 'add', budget });
+        unsynced.push({ action, budget });
         await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
       }
 
+      // Sync if online
       const netState = await NetInfo.fetch();
       if (netState.isConnected) {
-        await syncWithServer();
+        await syncWithServer(user);
         Toast.show({ message: isEdit ? 'Transaction updated!' : 'Transaction added!', type: 'success' });
       } else {
         Toast.show({ message: 'Saved offline. Will sync when connected.', type: 'info' });
@@ -96,52 +96,9 @@ export default function AddTransactionScreen() {
     } catch {
       Toast.show({ message: isEdit ? 'Failed to update transaction.' : 'Failed to add transaction.', type: 'error' });
     } finally {
-      setStage(false);
+      setLoading(false);
     }
   }, [title, amount, type, category, note, isEdit, params, router]);
-
-  async function syncWithServer() {
-    const user = await AsyncStorage.getItem('username');
-    let queue = await AsyncStorage.getItem('unsynced');
-    let unsynced = queue ? JSON.parse(queue) : [];
-    const newQueue = [];
-
-    const map = new Map();
-    for (let i = unsynced.length - 1; i >= 0; i--) {
-      const c = unsynced[i];
-      const key = c.action === 'delete' ? c.id : c.budget?._id;
-      if (!map.has(key)) map.set(key, c);
-    }
-    unsynced = Array.from(map.values()).reverse();
-
-    const serverList = (await axios.get(`${API_URL}/api/budgets?user=${user}`)).data || [];
-    const serverByClientId = new Set(serverList.filter(b => b.clientId).map(b => b.clientId));
-
-    for (const change of unsynced) {
-      let success = false;
-      try {
-        if (change.action === 'add') {
-          const clientId = change.budget._id;
-          if (!serverByClientId.has(clientId)) {
-            await axios.post(`${API_URL}/api/budgets`, { ...change.budget, clientId, user });
-            serverByClientId.add(clientId);
-          }
-          success = true;
-        } else if (change.action === 'edit') {
-          const clientId = change.budget._id;
-          await axios.patch(`${API_URL}/api/budgets`, { ...change.budget, clientId, user, id: clientId });
-          success = true;
-        } else if (change.action === 'delete') {
-          await axios.delete(`${API_URL}/api/budgets`, { data: { id: change.id, clientId: change.id, user } });
-          success = true;
-        }
-      } catch { success = false; }
-      if (!success) newQueue.push(change);
-    }
-    await AsyncStorage.setItem('unsynced', JSON.stringify(newQueue));
-    const res = await axios.get(`${API_URL}/api/budgets?user=${user}`);
-    await AsyncStorage.setItem('budgets', JSON.stringify(res.data));
-  }
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>

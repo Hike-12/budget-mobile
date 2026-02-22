@@ -16,9 +16,8 @@ import {
   View,
 } from 'react-native';
 import { Toast } from '../components/Toast';
+import { API_URL } from '../constants/api';
 import Colors from '../constants/colors';
-
-const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 
 export default function LoginScreen() {
   const [username, setUsername] = useState('');

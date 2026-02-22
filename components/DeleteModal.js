@@ -1,7 +1,8 @@
+import React from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
 
-const DeleteModal = ({ visible, onCancel, onDelete, title }) => {
+const DeleteModal = React.memo(function DeleteModal({ visible, onCancel, onDelete, title }) {
     return (
         <Modal
             transparent
@@ -39,7 +40,7 @@ const DeleteModal = ({ visible, onCancel, onDelete, title }) => {
             </Pressable>
         </Modal>
     );
-};
+});
 
 const styles = StyleSheet.create({
     overlay: {
