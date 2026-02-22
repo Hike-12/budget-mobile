@@ -41,3 +41,15 @@ app-example
 # generated native folders
 /ios
 /android
+
+agent/
+agents/
+
+.agent/
+.agents/
+
+agent/*
+agents/*
+
+./agent
+./agents
