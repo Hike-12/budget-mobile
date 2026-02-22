@@ -32,7 +32,12 @@ const DeleteModal = React.memo(function DeleteModal({ visible, onCancel, onDelet
                                 onPress={onDelete}
                                 activeOpacity={0.7}
                             >
-                                <Text style={styles.deleteButtonText}>Delete</Text>
+                                <Text style={styles.deleteButtonText} 
+                                numberOfLines={1}
+                                adjustsFontSizeToFit
+                                >
+                                    Delete
+                                </Text>
                             </TouchableOpacity>
                         </View>
                     </Pressable>
