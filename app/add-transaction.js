@@ -1,11 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import axios from 'axios';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -15,10 +14,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { Toast } from '../components/Toast';
 import Colors from '../constants/colors';
 
 const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 const categories = ['school friends', 'college friends', 'religion', 'personal', 'miscellaneous'];
+
 
 export default function AddTransactionScreen() {
   const params = useLocalSearchParams();
@@ -29,21 +30,23 @@ export default function AddTransactionScreen() {
   const [type, setType] = useState(params.type || 'expense');
   const [category, setCategory] = useState(params.category || 'miscellaneous');
   const [note, setNote] = useState(params.note || '');
-  const [loading, setLoading] = useState(false);
+  const [stage, setStage] = useState(false);
   const router = useRouter();
+
+  const loading = stage;
 
   const handleSubmit = useCallback(async () => {
     if (!title.trim() || !amount.trim()) {
-      Alert.alert('Error', 'Please fill all required fields');
+      Toast.show({ message: 'Please fill in title and amount.', type: 'warning' });
       return;
     }
     if (isNaN(Number(amount)) || Number(amount) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
+      Toast.show({ message: 'Please enter a valid amount.', type: 'warning' });
       return;
     }
 
-    setLoading(true);
     try {
+      setStage(true);
       const user = await AsyncStorage.getItem('username');
       const budgetId = isEdit && params._id
         ? params._id
@@ -68,16 +71,14 @@ export default function AddTransactionScreen() {
       } else {
         budgetsArr.push(budget);
       }
-
       await AsyncStorage.setItem('budgets', JSON.stringify(budgetsArr));
 
       const queue = await AsyncStorage.getItem('unsynced');
       const unsynced = queue ? JSON.parse(queue) : [];
       const alreadyQueued = unsynced.some(item => {
-        if (isEdit) return item.action === 'edit' && item.budget && item.budget._id === budgetId;
-        return item.action === 'add' && item.budget && item.budget._id === budgetId;
+        if (isEdit) return item.action === 'edit' && item.budget?._id === budgetId;
+        return item.action === 'add' && item.budget?._id === budgetId;
       });
-
       if (!alreadyQueued) {
         unsynced.push({ action: isEdit ? 'edit' : 'add', budget });
         await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
@@ -86,13 +87,16 @@ export default function AddTransactionScreen() {
       const netState = await NetInfo.fetch();
       if (netState.isConnected) {
         await syncWithServer();
+        Toast.show({ message: isEdit ? 'Transaction updated!' : 'Transaction added!', type: 'success' });
+      } else {
+        Toast.show({ message: 'Saved offline. Will sync when connected.', type: 'info' });
       }
 
       router.replace('/dashboard');
     } catch {
-      Alert.alert('Error', isEdit ? 'Failed to edit transaction' : 'Failed to add transaction');
+      Toast.show({ message: isEdit ? 'Failed to update transaction.' : 'Failed to add transaction.', type: 'error' });
     } finally {
-      setLoading(false);
+      setStage(false);
     }
   }, [title, amount, type, category, note, isEdit, params, router]);
 
@@ -141,6 +145,7 @@ export default function AddTransactionScreen() {
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <Stack.Screen options={{ title: isEdit ? 'Edit Transaction' : 'Add Transaction' }} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: 30 }}
@@ -218,13 +223,12 @@ export default function AddTransactionScreen() {
           activeOpacity={0.8}
           disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator color={Colors.dark} size="small" />
-          ) : (
-            <Text style={styles.submitButtonText}>
+          {loading
+            ? <ActivityIndicator color={Colors.dark} size="small" />
+            : <Text style={styles.submitButtonText} numberOfLines={1} adjustsFontSizeToFit>
               {isEdit ? 'Save Changes' : 'Add Transaction'}
             </Text>
-          )}
+          }
         </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -331,8 +335,8 @@ const styles = StyleSheet.create({
   submitButtonText: {
     color: Colors.dark,
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 15,
     textAlign: 'center',
-    width: '100%',
+    paddingHorizontal: 10,
   },
 });

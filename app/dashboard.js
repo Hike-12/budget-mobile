@@ -1,7 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import axios from 'axios';
-import { useRouter } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
@@ -15,6 +16,7 @@ import {
 } from 'react-native';
 import BudgetCard from '../components/BudgetCard';
 import FilterBar from '../components/FilterBar';
+import { Toast } from '../components/Toast';
 import TotalBalance from '../components/TotalBalance';
 import Colors from '../constants/colors';
 
@@ -41,11 +43,15 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
+      const wasOffline = !isOnline;
       setIsOnline(state.isConnected);
-      if (state.isConnected) syncWithServer();
+      if (state.isConnected) {
+        if (wasOffline) Toast.show({ message: 'Back online. Syncing...', type: 'info' });
+        syncWithServer();
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [isOnline]);
 
   useEffect(() => {
     loadBudgetsLocal();
@@ -67,6 +73,7 @@ export default function DashboardScreen() {
       AsyncStorage.setItem('budgets', JSON.stringify(updated));
       return updated;
     });
+    Toast.show({ message: 'Transaction deleted.', type: 'success' });
     await addToUnsyncedQueue({ action: 'delete', id });
     const netState = await NetInfo.fetch();
     if (netState.isConnected) syncWithServer();
@@ -234,6 +241,7 @@ export default function DashboardScreen() {
 
   const listHeader = useMemo(() => (
     <>
+      <Stack.Screen options={{ title: 'Dashboard' }} />
       {!isOnline && (
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineText}>Offline Mode — Using cached data</Text>
@@ -260,7 +268,14 @@ export default function DashboardScreen() {
         onPress={() => router.push('/add-transaction')}
         activeOpacity={0.8}
       >
-        <Text style={styles.addButtonText}>+ Add Transaction</Text>
+        <Ionicons name="add" size={20} color={Colors.dark} style={styles.addButtonIcon} />
+        <Text
+          style={styles.addButtonText}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          Add Transaction
+        </Text>
       </TouchableOpacity>
 
       {/* Search */}
@@ -379,16 +394,23 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     padding: 15,
     borderRadius: 10,
+    flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
     marginVertical: 10,
+    width: '100%',
+  },
+  addButtonIcon: {
+    position: 'absolute',
+    left: 15,
   },
   addButtonText: {
     color: Colors.dark,
     fontWeight: '600',
-    fontSize: 16,
+    fontSize: 15, // Slightly smaller to ensure fit
     textAlign: 'center',
     width: '100%',
+    paddingHorizontal: 40, // Avoid overlap with absolute icon
   },
   sectionHeader: {
     flexDirection: 'row',
