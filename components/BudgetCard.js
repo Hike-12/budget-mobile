@@ -25,10 +25,6 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
   const isIncome = budget.type === 'income';
   const { privacyMode } = usePrivacy();
 
-  const displayAmount = privacyMode
-    ? `${isIncome ? '+' : '-'}••••`
-    : `${isIncome ? '+' : '-'}₹${budget.amount.toLocaleString('en-IN')}`;
-
   // Memoize the formatted date string — avoids Date construction + toLocaleDateString per render
   const formattedDate = useMemo(
     () => new Date(budget.createdAt).toLocaleDateString('en-IN', DATE_FORMAT_OPTIONS),
@@ -43,6 +39,15 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
 
   const amountColor = isIncome ? Colors.green : Colors.red;
   const badgeBg = amountColor + '20';
+
+  const PrivacyBar = () => (
+    <View style={styles.privacyBar}>
+      <Text style={[styles.amount, { color: amountColor, marginRight: 4 }]}>
+        {isIncome ? '+' : '-'}
+      </Text>
+      <View style={styles.blueBar} />
+    </View>
+  );
 
   return (
     <View style={styles.card}>
@@ -63,9 +68,15 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
           </TouchableOpacity>
         </View>
       </View>
-      <Text style={[styles.amount, { color: amountColor }]}>
-        {displayAmount}
-      </Text>
+
+      {privacyMode ? (
+        <PrivacyBar />
+      ) : (
+        <Text style={[styles.amount, { color: amountColor }]}>
+          {isIncome ? '+' : '-'}₹{budget.amount.toLocaleString('en-IN')}
+        </Text>
+      )}
+
       <Text style={styles.category}>{displayCategory}</Text>
       {budget.note ? <Text style={styles.note}>{budget.note}</Text> : null}
       <View style={styles.footer}>
@@ -124,6 +135,18 @@ const styles = StyleSheet.create({
     marginBottom: 5,
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.8,
+  },
+  privacyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 36,
+  },
+  blueBar: {
+    width: 80,
+    height: 18,
+    backgroundColor: Colors.primary,
+    borderRadius: 4,
+    opacity: 0.6,
   },
   category: {
     color: Colors.secondary,

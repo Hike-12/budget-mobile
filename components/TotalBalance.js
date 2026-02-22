@@ -3,8 +3,6 @@ import { StyleSheet, Text, View } from 'react-native';
 import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
 
-const MASKED = '••••••';
-
 const TotalBalance = React.memo(function TotalBalance({ budgets }) {
   const { privacyMode } = usePrivacy();
 
@@ -19,24 +17,43 @@ const TotalBalance = React.memo(function TotalBalance({ budgets }) {
     return { income: inc, expense: exp, total: inc - exp };
   }, [budgets]);
 
-  const mask = (val) =>
-    privacyMode ? MASKED : `₹${val.toLocaleString('en-IN')}`;
+  const PrivacyBar = ({ style }) => (
+    <View style={[styles.privacyBar, style]} />
+  );
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Total Balance</Text>
-      <Text style={[styles.amount, { color: total >= 0 ? Colors.primary : Colors.red }]}>
-        {privacyMode ? MASKED : `₹${total.toLocaleString('en-IN')}`}
-      </Text>
+      <View style={styles.mainAmountContainer}>
+        {privacyMode ? (
+          <PrivacyBar style={styles.mainPrivacyBar} />
+        ) : (
+          <Text style={[styles.amount, { color: total >= 0 ? Colors.primary : Colors.red }]}>
+            ₹{total.toLocaleString('en-IN')}
+          </Text>
+        )}
+      </View>
       <View style={styles.row}>
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Income</Text>
-          <Text style={[styles.statValue, { color: Colors.green }]}>{mask(income)}</Text>
+          {privacyMode ? (
+            <PrivacyBar style={styles.statPrivacyBar} />
+          ) : (
+            <Text style={[styles.statValue, { color: Colors.green }]}>
+              ₹{income.toLocaleString('en-IN')}
+            </Text>
+          )}
         </View>
         <View style={styles.divider} />
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Expense</Text>
-          <Text style={[styles.statValue, { color: Colors.red }]}>{mask(expense)}</Text>
+          {privacyMode ? (
+            <PrivacyBar style={styles.statPrivacyBar} />
+          ) : (
+            <Text style={[styles.statValue, { color: Colors.red }]}>
+              ₹{expense.toLocaleString('en-IN')}
+            </Text>
+          )}
         </View>
       </View>
     </View>
@@ -59,13 +76,31 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
+  mainAmountContainer: {
+    height: 48,
+    justifyContent: 'center',
+    marginTop: 5,
+    marginBottom: 14,
+  },
   amount: {
     fontSize: 32,
     fontWeight: '600',
-    marginTop: 5,
-    marginBottom: 14,
     fontVariant: ['tabular-nums'],
     letterSpacing: -1,
+  },
+  privacyBar: {
+    backgroundColor: Colors.primary,
+    borderRadius: 6,
+    opacity: 0.6,
+  },
+  mainPrivacyBar: {
+    width: 140,
+    height: 32,
+  },
+  statPrivacyBar: {
+    width: 60,
+    height: 16,
+    marginTop: 4,
   },
   row: {
     flexDirection: 'row',
