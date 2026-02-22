@@ -1,18 +1,15 @@
-import React, { useCallback } from 'react';
-import { Alert, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
+import DeleteModal from './DeleteModal';
 
 const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) {
-  const confirmDelete = useCallback(() => {
-    Alert.alert(
-      'Delete Transaction',
-      `Are you sure you want to delete "${budget.title}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete', style: 'destructive', onPress: () => onDelete(budget._id) },
-      ]
-    );
-  }, [budget._id, budget.title, onDelete]);
+  const [modalVisible, setModalVisible] = useState(false);
+
+  const handleDelete = useCallback(() => {
+    setModalVisible(false);
+    onDelete(budget._id);
+  }, [budget._id, onDelete]);
 
   const handleEdit = useCallback(() => {
     onEdit(budget);
@@ -22,19 +19,25 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
 
   return (
     <View style={styles.card}>
+      <DeleteModal
+        visible={modalVisible}
+        title={budget.title}
+        onCancel={() => setModalVisible(false)}
+        onDelete={handleDelete}
+      />
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={1}>{budget.title}</Text>
         <View style={styles.actions}>
           <TouchableOpacity onPress={handleEdit} hitSlop={8} activeOpacity={0.7}>
             <Text style={styles.editButton}>Edit</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={confirmDelete} hitSlop={8} activeOpacity={0.7}>
+          <TouchableOpacity onPress={() => setModalVisible(true)} hitSlop={8} activeOpacity={0.7}>
             <Text style={styles.deleteButton}>Delete</Text>
           </TouchableOpacity>
         </View>
       </View>
       <Text style={[styles.amount, { color: isIncome ? Colors.green : Colors.red }]}>
-        {isIncome ? '+' : '-'} ₹ {budget.amount.toLocaleString('en-IN')}
+        {isIncome ? '+' : '-'}₹{budget.amount.toLocaleString('en-IN')}
       </Text>
       <Text style={styles.category}>
         {budget.category.charAt(0).toUpperCase() + budget.category.slice(1)}
@@ -101,6 +104,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 5,
     fontVariant: ['tabular-nums'],
+    letterSpacing: -0.8,
   },
   category: {
     color: Colors.secondary,

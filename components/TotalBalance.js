@@ -11,20 +11,20 @@ const TotalBalance = React.memo(function TotalBalance({ budgets }) {
     <View style={styles.container}>
       <Text style={styles.label}>Total Balance</Text>
       <Text style={[styles.amount, { color: total >= 0 ? Colors.primary : Colors.red }]}>
-        ₹ {total.toLocaleString('en-IN')}
+        ₹{total.toLocaleString('en-IN')}
       </Text>
       <View style={styles.row}>
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Income</Text>
           <Text style={[styles.statValue, { color: Colors.green }]}>
-            ₹ {income.toLocaleString('en-IN')}
+            ₹{income.toLocaleString('en-IN')}
           </Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Expense</Text>
           <Text style={[styles.statValue, { color: Colors.red }]}>
-            ₹ {expense.toLocaleString('en-IN')}
+            ₹{expense.toLocaleString('en-IN')}
           </Text>
         </View>
       </View>
@@ -54,6 +54,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 14,
     fontVariant: ['tabular-nums'],
+    letterSpacing: -1, // Pulls numbers closer
   },
   row: {
     flexDirection: 'row',
@@ -76,6 +77,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '500',
     fontVariant: ['tabular-nums'],
+    letterSpacing: -0.3,
   },
   divider: {
     width: 1,
