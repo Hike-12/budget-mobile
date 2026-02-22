@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView } from 'react-native';
+import React, { useCallback, useState } from 'react';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
 
 const types = ['All', 'Expense', 'Income'];
@@ -11,13 +11,25 @@ const ranges = [
   { label: 'This Year', value: 'year' },
 ];
 const months = [
-  'All', 'January', 'February', 'March', 'April', 'May', 'June',
-  'July', 'August', 'September', 'October', 'November', 'December'
+  'All', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
 ];
 const currentYear = new Date().getFullYear();
-const years = Array.from({ length: 6 }, (_, i) => (currentYear - i).toString());
+const years = ['All', ...Array.from({ length: 6 }, (_, i) => (currentYear - i).toString())];
 
-export default function FilterBar({
+const FilterChip = React.memo(function FilterChip({ label, active, onPress }) {
+  return (
+    <TouchableOpacity
+      style={[styles.button, active && styles.buttonActive]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <Text style={[styles.text, active && styles.textActive]}>{label}</Text>
+    </TouchableOpacity>
+  );
+});
+
+const FilterBar = React.memo(function FilterBar({
   filterType,
   setFilterType,
   filterCategory,
@@ -35,107 +47,93 @@ export default function FilterBar({
     filterType !== 'all' ||
     filterCategory !== 'All' ||
     filterMonth !== '0' ||
-    filterYear !== currentYear.toString() ||
+    filterYear !== 'All' ||
     filterRange !== 'all';
 
-  function clearFilters() {
+  const clearFilters = useCallback(() => {
     setFilterType('all');
     setFilterCategory('All');
     setFilterMonth('0');
-    setFilterYear(currentYear.toString());
+    setFilterYear('All');
     setFilterRange('all');
-  }
+  }, [setFilterType, setFilterCategory, setFilterMonth, setFilterYear, setFilterRange]);
 
   return (
     <View style={styles.container}>
       <TouchableOpacity
         style={[styles.toggleButton, open && styles.toggleButtonActive]}
         onPress={() => setOpen(!open)}
+        activeOpacity={0.7}
       >
         <Text style={styles.toggleText}>
-          {open ? 'Hide Filters' : 'Show Filters'}
+          {open ? 'Hide Filters' : 'Filters'}
         </Text>
-        {hasActiveFilters && (
-          <View style={styles.activeDot} />
-        )}
+        {hasActiveFilters && <View style={styles.activeDot} />}
       </TouchableOpacity>
       {open && (
         <View style={styles.filtersContainer}>
-          {/* Type */}
           <Text style={styles.groupLabel}>Type</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
             {types.map(t => (
-              <TouchableOpacity
+              <FilterChip
                 key={t}
-                style={[styles.button, filterType === t.toLowerCase() && styles.buttonActive]}
+                label={t}
+                active={filterType === t.toLowerCase()}
                 onPress={() => setFilterType(t.toLowerCase())}
-              >
-                <Text style={[styles.text, filterType === t.toLowerCase() && styles.textActive]}>{t}</Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
-          
-          {/* Category */}
+
           <Text style={styles.groupLabel}>Category</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
             {categories.map(c => (
-              <TouchableOpacity
+              <FilterChip
                 key={c}
-                style={[styles.button, filterCategory === c && styles.buttonActive]}
+                label={c.charAt(0).toUpperCase() + c.slice(1)}
+                active={filterCategory === c}
                 onPress={() => setFilterCategory(c)}
-              >
-                <Text style={[styles.text, filterCategory === c && styles.textActive]}>
-                  {c.charAt(0).toUpperCase() + c.slice(1)}
-                </Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
-          
-          {/* Range */}
+
           <Text style={styles.groupLabel}>Range</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
             {ranges.map(r => (
-              <TouchableOpacity
+              <FilterChip
                 key={r.value}
-                style={[styles.button, filterRange === r.value && styles.buttonActive]}
+                label={r.label}
+                active={filterRange === r.value}
                 onPress={() => setFilterRange(r.value)}
-              >
-                <Text style={[styles.text, filterRange === r.value && styles.textActive]}>{r.label}</Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
-          
-          {/* Month */}
+
           <Text style={styles.groupLabel}>Month</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
             {months.map((m, i) => (
-              <TouchableOpacity
+              <FilterChip
                 key={m}
-                style={[styles.button, filterMonth === i.toString() && styles.buttonActive]}
+                label={m}
+                active={filterMonth === i.toString()}
                 onPress={() => setFilterMonth(i.toString())}
-              >
-                <Text style={[styles.text, filterMonth === i.toString() && styles.textActive]}>{m}</Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
-          
-          {/* Year */}
+
           <Text style={styles.groupLabel}>Year</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.groupScroll}>
             {years.map(y => (
-              <TouchableOpacity
+              <FilterChip
                 key={y}
-                style={[styles.button, filterYear === y && styles.buttonActive]}
+                label={y}
+                active={filterYear === y}
                 onPress={() => setFilterYear(y)}
-              >
-                <Text style={[styles.text, filterYear === y && styles.textActive]}>{y}</Text>
-              </TouchableOpacity>
+              />
             ))}
           </ScrollView>
-          
-          {/* Clear Filters */}
+
           {hasActiveFilters && (
-            <TouchableOpacity style={styles.clearButton} onPress={clearFilters}>
+            <TouchableOpacity style={styles.clearButton} onPress={clearFilters} activeOpacity={0.7}>
               <Text style={styles.clearText}>Clear Filters</Text>
             </TouchableOpacity>
           )}
@@ -143,21 +141,85 @@ export default function FilterBar({
       )}
     </View>
   );
-}
+});
+
+export default FilterBar;
 
 const styles = StyleSheet.create({
-  container: { marginBottom: 15, backgroundColor: Colors.dark, borderRadius: 10, padding: 8 },
-  toggleButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', padding: 10, backgroundColor: Colors.primary + '20', borderRadius: 8, marginBottom: 5 },
-  toggleButtonActive: { backgroundColor: Colors.secondary },
-  toggleText: { color: Colors.accent, fontWeight: 'bold', fontSize: 14 },
-  activeDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: Colors.primary, marginLeft: 8 },
-  filtersContainer: { paddingBottom: 10 },
-  groupLabel: { color: Colors.accent, fontWeight: '600', fontSize: 12, marginVertical: 4, marginLeft: 2 },
-  groupScroll: { marginBottom: 8 },
-  button: { paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.primary + '20', borderColor: Colors.secondary, borderWidth: 1, marginRight: 8, marginBottom: 4 },
-  buttonActive: { backgroundColor: Colors.secondary },
-  text: { color: Colors.secondary, fontSize: 12 },
-  textActive: { color: Colors.dark, fontWeight: '600' },
-  clearButton: { backgroundColor: Colors.red, padding: 8, borderRadius: 8, alignSelf: 'center', marginTop: 8 },
-  clearText: { color: Colors.dark, fontWeight: 'bold', fontSize: 13 },
+  container: {
+    marginBottom: 15,
+    backgroundColor: Colors.dark,
+    borderRadius: 10,
+    padding: 8,
+  },
+  toggleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+    backgroundColor: Colors.primary + '20',
+    borderRadius: 8,
+    marginBottom: 5,
+  },
+  toggleButtonActive: {
+    backgroundColor: Colors.secondary,
+  },
+  toggleText: {
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 14,
+  },
+  activeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.primary,
+    marginLeft: 8,
+  },
+  filtersContainer: {
+    paddingBottom: 10,
+  },
+  groupLabel: {
+    color: Colors.accent,
+    fontWeight: '500',
+    fontSize: 12,
+    marginVertical: 4,
+    marginLeft: 2,
+  },
+  groupScroll: {
+    marginBottom: 8,
+  },
+  button: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: Colors.primary + '20',
+    borderColor: Colors.secondary,
+    borderWidth: 1,
+    marginRight: 8,
+    marginBottom: 4,
+  },
+  buttonActive: {
+    backgroundColor: Colors.secondary,
+  },
+  text: {
+    color: Colors.secondary,
+    fontSize: 12,
+  },
+  textActive: {
+    color: Colors.dark,
+    fontWeight: '500',
+  },
+  clearButton: {
+    backgroundColor: Colors.red,
+    padding: 8,
+    borderRadius: 8,
+    alignSelf: 'center',
+    marginTop: 8,
+  },
+  clearText: {
+    color: Colors.dark,
+    fontWeight: '600',
+    fontSize: 13,
+  },
 });
