@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "skills": {
+    "building-native-ui": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "5ebc7d734c169ee8d4ece12f2ee9ccd569136bcc32235b42c2b0a15b54d6474e"
+    },
+    "expo": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "computedHash": "c4154d8caf98cf11ef0285098a27555784bc0c4b340822f1f6b656b2857d60c0"
+    },
+    "expo-api-routes": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "267bd3bfa27718103a74458df1e875ff6f6db31cba2ebe1d8a527cf25da39761"
+    },
+    "expo-app-design": {
+      "source": "skillcreatorai/ai-agent-skills",
+      "sourceType": "github",
+      "computedHash": "7d8d9e306dfb500dc70cabc49b94c97f5b3ad2084c62b0e72bb11f0fa3f4e179"
+    },
+    "expo-architect": {
+      "source": "shipshitdev/library",
+      "sourceType": "github",
+      "computedHash": "efc865e80fd95d2d42d776f6747e259e691b9b160f5c1c1e9ea46426c5c25e9a"
+    },
+    "expo-cicd-workflows": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "6cd9fa605a8144d424daa02489633fa0b0fcb15d74e29d0d23e6d6d894fc51df"
+    },
+    "expo-config-setup": {
+      "source": "dengineproblem/agents-monorepo",
+      "sourceType": "github",
+      "computedHash": "aba1d912aec95548fead658784fd433334b6ac1c779e6eeb974b12dddf0f500e"
+    },
+    "expo-deployment": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "2a26de7ec3faaf19333ec5660152e5e711ef000a29d75324dff51967bc382755"
+    },
+    "expo-dev-client": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "ea568acdc9036b82b969159757456e9a4cdfae7f645ac2fad5fdf0f734f53568"
+    },
+    "expo-react-native-coder": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "computedHash": "e80cab9c32b373b2d85acb645637c9bbbe7fd1cb1faaba7b47ef56440e650321"
+    },
+    "expo-react-native-javascript-best-practices": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "computedHash": "470738bbfdf0cd62252110800d572a00e372bb46fcfe410f705f99875b4b1b58"
+    },
+    "expo-react-native-performance": {
+      "source": "pproenca/dot-skills",
+      "sourceType": "github",
+      "computedHash": "6fb56ac57c3b2967bf9ae44219e8945d66b1b736912b96eaa7a194ff85cfd124"
+    },
+    "expo-react-native-typescript": {
+      "source": "mindrally/skills",
+      "sourceType": "github",
+      "computedHash": "ae6a3db1d4b800bf9d69e64600bbdccadbacd22b127feeb71a041c56ad4f1e55"
+    },
+    "expo-tailwind-setup": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "16c53e80cacd65369acfd8a4f5cf06a60083cc6d980127b4b2e384b81ce0e547"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "computedHash": "25872a21881a950edc3db1f3329664d60405d539660ce05b3265db2de06a7dfd"
+    },
+    "mobile-design": {
+      "source": "vudovn/antigravity-kit",
+      "sourceType": "github",
+      "computedHash": "2cd07193e7c49d7450bb68364ce3d2b0155a7ea645164b671dfa4d32b7afb77f"
+    },
+    "native-data-fetching": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "b42e924c0297d74657c078f8c06b96f0c34078d6ad89b2a5302c2c70fe362fe8"
+    },
+    "react-native-animations": {
+      "source": "pluginagentmarketplace/custom-plugin-react-native",
+      "sourceType": "github",
+      "computedHash": "ced8f430c7df78961404e2a0b7db8b2a6cc8fa571b1f0b7c40ad5399a4663f2f"
+    },
+    "react-native-architecture": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "6b52fafc80d1e78243e56ff42114128ba456f515b383a11a792541d999ace652"
+    },
+    "react-native-best-practices": {
+      "source": "callstackincubator/agent-skills",
+      "sourceType": "github",
+      "computedHash": "83eede7791ad562470273545256092fe08ebcbc0b52d91c950fabb41692427d0"
+    },
+    "react-native-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "22c004aae28664649448ea503a953a1a3390521787473727d4b57adf6abce38a"
+    },
+    "react-native-expo": {
+      "source": "ovachiever/droid-tings",
+      "sourceType": "github",
+      "computedHash": "bfc20b20bd90ec2ecbc890cfbadc45dbd957be43d48cf5a73050cb4a08ffbb2e"
+    },
+    "senior-mobile": {
+      "source": "borghei/claude-skills",
+      "sourceType": "github",
+      "computedHash": "ed021495b72167d0f83a5edfbe07cab7066fa746c9e81eb4916f2a700c5287c7"
+    },
+    "styling-nativewind-v4-expo": {
+      "source": "tristanmanchester/agent-skills",
+      "sourceType": "github",
+      "computedHash": "a237e781616869d76470bc4b11adac59b8a68c7580bef71c15963f7aaee81d3a"
+    },
+    "ui-mobile": {
+      "source": "alinaqi/claude-bootstrap",
+      "sourceType": "github",
+      "computedHash": "03ff504483106981bec32404e7b6aedb669b2eeab96cd2c8c76e18ab0b60811f"
+    },
+    "upgrading-expo": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "7d1b7787b515b4fd6f089311e084b946f9c0a5fa70d24cf35c1fb82403e3afb8"
+    },
+    "use-dom": {
+      "source": "expo/skills",
+      "sourceType": "github",
+      "computedHash": "63a18bc2e07d18313aa9749bbb59c542c9b141424c56bd5514907be276c5bf80"
+    },
+    "vercel-react-native-skills": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "a804b4e848059822638c390359976f7021380bcefb1469d473aa4e9202c15ecb"
+    }
+  }
+}
