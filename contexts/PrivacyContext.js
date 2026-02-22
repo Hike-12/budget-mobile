@@ -1,23 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useState } from 'react';
 
 const PrivacyContext = createContext({
     privacyMode: true,
     togglePrivacy: () => { },
+    setPrivacyMode: () => { },
 });
 
 const STORAGE_KEY = 'privacyMode';
 
 export function PrivacyProvider({ children }) {
-    // ON by default
+    // Private by default
     const [privacyMode, setPrivacyMode] = useState(true);
-
-    // Load saved preference on mount
-    useEffect(() => {
-        AsyncStorage.getItem(STORAGE_KEY).then(val => {
-            if (val !== null) setPrivacyMode(val === 'true');
-        });
-    }, []);
 
     const togglePrivacy = useCallback(() => {
         setPrivacyMode(prev => {
@@ -27,8 +21,13 @@ export function PrivacyProvider({ children }) {
         });
     }, []);
 
+    const updatePrivacy = useCallback((val) => {
+        setPrivacyMode(val);
+        AsyncStorage.setItem(STORAGE_KEY, String(val));
+    }, []);
+
     return (
-        <PrivacyContext.Provider value={{ privacyMode, togglePrivacy }}>
+        <PrivacyContext.Provider value={{ privacyMode, togglePrivacy, setPrivacyMode: updatePrivacy }}>
             {children}
         </PrivacyContext.Provider>
     );

@@ -33,8 +33,8 @@ const DeleteModal = React.memo(function DeleteModal({ visible, onCancel, onDelet
                                 activeOpacity={0.7}
                             >
                                 <Text style={styles.deleteButtonText} 
-                                numberOfLines={1}
-                                adjustsFontSizeToFit
+                                    numberOfLines={1}
+                                    adjustsFontSizeToFit
                                 >
                                     Delete
                                 </Text>
