@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
+import { usePrivacy } from '../contexts/PrivacyContext';
 import DeleteModal from './DeleteModal';
 
 const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) {
@@ -16,6 +17,10 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
   }, [budget, onEdit]);
 
   const isIncome = budget.type === 'income';
+  const { privacyMode } = usePrivacy();
+  const displayAmount = privacyMode
+    ? `${isIncome ? '+' : '-'}••••`
+    : `${isIncome ? '+' : '-'}₹${budget.amount.toLocaleString('en-IN')}`;
 
   return (
     <View style={styles.card}>
@@ -37,7 +42,7 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
         </View>
       </View>
       <Text style={[styles.amount, { color: isIncome ? Colors.green : Colors.red }]}>
-        {isIncome ? '+' : '-'}₹{budget.amount.toLocaleString('en-IN')}
+        {displayAmount}
       </Text>
       <Text style={styles.category}>
         {budget.category.charAt(0).toUpperCase() + budget.category.slice(1)}

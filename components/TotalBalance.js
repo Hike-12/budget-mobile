@@ -1,31 +1,35 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Colors from '../constants/colors';
+import { usePrivacy } from '../contexts/PrivacyContext';
+
+const MASKED = '••••••';
 
 const TotalBalance = React.memo(function TotalBalance({ budgets }) {
+  const { privacyMode } = usePrivacy();
+
   const income = budgets.reduce((acc, b) => (b.type === 'income' ? acc + b.amount : acc), 0);
   const expense = budgets.reduce((acc, b) => (b.type === 'expense' ? acc + b.amount : acc), 0);
   const total = income - expense;
+
+  const mask = (val) =>
+    privacyMode ? MASKED : `₹${val.toLocaleString('en-IN')}`;
 
   return (
     <View style={styles.container}>
       <Text style={styles.label}>Total Balance</Text>
       <Text style={[styles.amount, { color: total >= 0 ? Colors.primary : Colors.red }]}>
-        ₹{total.toLocaleString('en-IN')}
+        {privacyMode ? MASKED : `₹${total.toLocaleString('en-IN')}`}
       </Text>
       <View style={styles.row}>
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Income</Text>
-          <Text style={[styles.statValue, { color: Colors.green }]}>
-            ₹{income.toLocaleString('en-IN')}
-          </Text>
+          <Text style={[styles.statValue, { color: Colors.green }]}>{mask(income)}</Text>
         </View>
         <View style={styles.divider} />
         <View style={styles.stat}>
           <Text style={styles.statLabel}>Expense</Text>
-          <Text style={[styles.statValue, { color: Colors.red }]}>
-            ₹{expense.toLocaleString('en-IN')}
-          </Text>
+          <Text style={[styles.statValue, { color: Colors.red }]}>{mask(expense)}</Text>
         </View>
       </View>
     </View>
@@ -54,7 +58,7 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 14,
     fontVariant: ['tabular-nums'],
-    letterSpacing: -1, // Pulls numbers closer
+    letterSpacing: -1,
   },
   row: {
     flexDirection: 'row',

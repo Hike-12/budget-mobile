@@ -19,6 +19,7 @@ import FilterBar from '../components/FilterBar';
 import { Toast } from '../components/Toast';
 import TotalBalance from '../components/TotalBalance';
 import Colors from '../constants/colors';
+import { usePrivacy } from '../contexts/PrivacyContext';
 
 const API_URL = 'https://budget-tracker-aliqyaan.vercel.app';
 const PAGE_SIZE = 15;
@@ -38,6 +39,7 @@ export default function DashboardScreen() {
   const [page, setPage] = useState(1);
 
   const router = useRouter();
+  const { privacyMode, togglePrivacy } = usePrivacy();
 
   // --- Network & data loading ---
 
@@ -241,7 +243,6 @@ export default function DashboardScreen() {
 
   const listHeader = useMemo(() => (
     <>
-      <Stack.Screen options={{ title: 'Dashboard' }} />
       {!isOnline && (
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineText}>Offline Mode — Using cached data</Text>
@@ -327,29 +328,50 @@ export default function DashboardScreen() {
   ), [searchQuery]);
 
   return (
-    <FlatList
-      data={paginatedBudgets}
-      renderItem={renderItem}
-      keyExtractor={keyExtractor}
-      ListHeaderComponent={listHeader}
-      ListFooterComponent={listFooter}
-      ListEmptyComponent={listEmpty}
-      contentContainerStyle={styles.listContent}
-      style={styles.container}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor={Colors.primary}
-          colors={[Colors.primary]}
-        />
-      }
-      showsVerticalScrollIndicator={false}
-      removeClippedSubviews={Platform.OS === 'android'}
-      maxToRenderPerBatch={10}
-      windowSize={7}
-      initialNumToRender={PAGE_SIZE}
-    />
+    <>
+      <Stack.Screen
+        options={{
+          title: 'Dashboard',
+          headerRight: () => (
+            <TouchableOpacity
+              onPress={togglePrivacy}
+              hitSlop={12}
+              style={{ marginRight: 4 }}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={privacyMode ? 'eye-off-outline' : 'eye-outline'}
+                size={22}
+                color={Colors.accent}
+              />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+      <FlatList
+        data={paginatedBudgets}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
+        ListEmptyComponent={listEmpty}
+        contentContainerStyle={styles.listContent}
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={Platform.OS === 'android'}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+        initialNumToRender={PAGE_SIZE}
+      />
+    </>
   );
 }
 
