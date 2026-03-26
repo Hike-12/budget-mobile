@@ -4,19 +4,25 @@
     "slug": "budget-mobile",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/logo-square.png",
     "scheme": "budgetmobile",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/9fa4e450-9e95-49ad-badc-1d003b41514e"
+    },
     "ios": {
       "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/images/logo.png",
-        "backgroundImage": "./assets/images/logo.png",
-        "monochromeImage": "./assets/images/logo.png"
+        "foregroundImage": "./assets/images/logo-square.png",
+        "backgroundImage": "./assets/images/logo-square.png",
+        "monochromeImage": "./assets/images/logo-square.png"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
@@ -39,7 +45,8 @@
             "backgroundColor": "#000000"
           }
         }
-      ]
+      ],
+      "expo-font"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -50,6 +57,9 @@
       "eas": {
         "projectId": "9fa4e450-9e95-49ad-badc-1d003b41514e"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
     }
   }
 }

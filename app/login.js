@@ -40,9 +40,11 @@ export default function LoginScreen() {
         const res = await axios.post(`${API_URL}/api/login`, { username, password });
 
         if (res.data.success) {
-          await AsyncStorage.setItem('username', username);
+          // Use the normalized username from the server response, not the original input
+          const normalizedUsername = res.data.username;
+          await AsyncStorage.setItem('username', normalizedUsername);
           await AsyncStorage.setItem('password', password);
-          const budgetsRes = await axios.get(`${API_URL}/api/budgets?user=${username}`);
+          const budgetsRes = await axios.get(`${API_URL}/api/budgets?user=${normalizedUsername}`);
           await AsyncStorage.setItem('budgets', JSON.stringify(budgetsRes.data));
           Toast.show({ message: 'Welcome back!', type: 'success' });
           router.replace('/dashboard');
