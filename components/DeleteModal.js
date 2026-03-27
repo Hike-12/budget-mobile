@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
 
 const DeleteModal = React.memo(function DeleteModal({ visible, onCancel, onDelete, title }) {
@@ -65,10 +65,14 @@ const styles = StyleSheet.create({
         padding: 24,
         borderWidth: 1,
         borderColor: 'rgba(255, 255, 255, 0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0px 4px 12px rgba(0,0,0,0.30)' }
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.3,
+                shadowRadius: 8,
+            }),
         elevation: 8,
     },
     modalTitle: {

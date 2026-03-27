@@ -2,6 +2,29 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_URL } from '../constants/api';
 
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function makeIdempotencyKey(action, user, stableId, version = '') {
+    return `${action}:${String(user || '').toLowerCase()}:${stableId}:${version}`;
+}
+
+async function withRetry(task, { retries = 3, baseDelay = 300 } = {}) {
+    let lastError;
+    for (let i = 0; i < retries; i++) {
+        try {
+            return await task();
+        } catch (error) {
+            lastError = error;
+            if (i < retries - 1) {
+                await sleep(baseDelay * (2 ** i));
+            }
+        }
+    }
+    throw lastError;
+}
+
 /**
  * Adds a change to the unsynced queue, deduplicating by action+id.
  * @param {{ action: 'add'|'edit'|'delete', budget?: object, id?: string }} change
@@ -49,6 +72,8 @@ export async function syncWithServer(user) {
     if (!user) user = await AsyncStorage.getItem('username');
     if (!user) return null;
 
+    const normalizedUser = String(user).toLowerCase().trim();
+
     const raw = await AsyncStorage.getItem('unsynced');
     let unsynced = raw ? JSON.parse(raw) : [];
     unsynced = dedupeQueue(unsynced);
@@ -56,13 +81,16 @@ export async function syncWithServer(user) {
     // Fetch current server state once — reused for dedup AND as the final truth
     let serverList;
     try {
-        serverList = (await axios.get(`${API_URL}/api/budgets?user=${user}`)).data || [];
+        serverList = (await axios.get(`${API_URL}/api/budgets?user=${normalizedUser}`)).data || [];
     } catch {
         return null; // network issue — bail without losing queue
     }
 
     const serverByClientId = new Set(
         serverList.filter(b => b.clientId).map(b => b.clientId)
+    );
+    const serverById = new Set(
+        serverList.filter(b => b._id).map(b => String(b._id))
     );
 
     const failedQueue = [];
@@ -72,23 +100,61 @@ export async function syncWithServer(user) {
             if (change.action === 'add') {
                 const clientId = change.budget._id;
                 if (!serverByClientId.has(clientId)) {
-                    await axios.post(`${API_URL}/api/budgets`, { ...change.budget, clientId, user });
+                    const payload = {
+                        ...change.budget,
+                        clientId,
+                        user: normalizedUser,
+                        updatedAt: change.budget.updatedAt || new Date().toISOString(),
+                    };
+                    await withRetry(() => axios.post(`${API_URL}/api/budgets`, payload, {
+                        headers: {
+                            'X-Idempotency-Key': makeIdempotencyKey('add', normalizedUser, clientId, payload.updatedAt),
+                        },
+                    }));
                     serverByClientId.add(clientId);
                 }
             } else if (change.action === 'edit') {
                 const clientId = change.budget._id;
-                await axios.patch(`${API_URL}/api/budgets`, {
+                const payload = {
                     ...change.budget,
                     clientId,
-                    user,
+                    user: normalizedUser,
                     id: clientId,
-                });
+                    updatedAt: change.budget.updatedAt || new Date().toISOString(),
+                };
+                await withRetry(() => axios.patch(`${API_URL}/api/budgets`, payload, {
+                    headers: {
+                        'X-Idempotency-Key': makeIdempotencyKey('edit', normalizedUser, clientId, payload.updatedAt),
+                    },
+                }));
             } else if (change.action === 'delete') {
-                await axios.delete(`${API_URL}/api/budgets`, {
-                    data: { id: change.id, clientId: change.id, user },
-                });
+                const stableId = change.id;
+                const existsOnServer = serverByClientId.has(stableId) || serverById.has(String(stableId));
+
+                // Deleting a non-existent entity is already a successful end state.
+                if (!existsOnServer) {
+                    continue;
+                }
+
+                await withRetry(() => axios.delete(`${API_URL}/api/budgets`, {
+                    data: { id: stableId, clientId: stableId, user: normalizedUser },
+                    headers: {
+                        'X-Idempotency-Key': makeIdempotencyKey('delete', normalizedUser, stableId),
+                    },
+                }));
+
+                serverByClientId.delete(stableId);
+                serverById.delete(String(stableId));
             }
-        } catch {
+        } catch (error) {
+            // Conflict means server has a newer update; keep server truth and drop local edit.
+            if (error?.response?.status === 409 && change.action === 'edit') {
+                continue;
+            }
+            // DELETE is idempotent: missing record means it's already deleted.
+            if (error?.response?.status === 404 && change.action === 'delete') {
+                continue;
+            }
             failedQueue.push(change);
         }
     }
@@ -98,7 +164,7 @@ export async function syncWithServer(user) {
     // Only re-fetch if mutations were attempted so we get the true final state
     if (unsynced.length > 0) {
         try {
-            serverList = (await axios.get(`${API_URL}/api/budgets?user=${user}`)).data || [];
+            serverList = (await axios.get(`${API_URL}/api/budgets?user=${normalizedUser}`)).data || [];
         } catch {
             // Keep the list from the earlier fetch
         }

@@ -19,6 +19,27 @@ import { Toast } from '../components/Toast';
 import { API_URL } from '../constants/api';
 import Colors from '../constants/colors';
 
+function normalizeUsername(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+async function tryOfflineLogin(inputUsername, inputPassword, router) {
+  const savedUsername = await AsyncStorage.getItem('username');
+  const savedPassword = await AsyncStorage.getItem('password');
+
+  const matchesUsername = normalizeUsername(inputUsername) === normalizeUsername(savedUsername);
+  const matchesPassword = String(inputPassword || '') === String(savedPassword || '');
+
+  if (matchesUsername && matchesPassword) {
+    Toast.show({ message: 'Signed in offline.', type: 'info' });
+    router.replace('/dashboard');
+    return true;
+  }
+
+  Toast.show({ message: 'Please log in online at least once.', type: 'error' });
+  return false;
+}
+
 export default function LoginScreen() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -41,28 +62,32 @@ export default function LoginScreen() {
 
         if (res.data.success) {
           // Use the normalized username from the server response, not the original input
-          const normalizedUsername = res.data.username;
+          const normalizedUsername = normalizeUsername(res.data.username);
           await AsyncStorage.setItem('username', normalizedUsername);
           await AsyncStorage.setItem('password', password);
-          const budgetsRes = await axios.get(`${API_URL}/api/budgets?user=${normalizedUsername}`);
-          await AsyncStorage.setItem('budgets', JSON.stringify(budgetsRes.data));
+
+          // Do not block login if fetching budgets fails; keep cached data for resilience.
+          try {
+            const budgetsRes = await axios.get(`${API_URL}/api/budgets?user=${normalizedUsername}`);
+            await AsyncStorage.setItem('budgets', JSON.stringify(budgetsRes.data));
+          } catch {
+            // Keep previous cached budgets when fetch fails.
+          }
+
           Toast.show({ message: 'Welcome back!', type: 'success' });
           router.replace('/dashboard');
         } else {
           Toast.show({ message: 'Invalid username or password.', type: 'error' });
         }
       } else {
-        const savedUsername = await AsyncStorage.getItem('username');
-        const savedPassword = await AsyncStorage.getItem('password');
-        if (username === savedUsername && password === savedPassword) {
-          Toast.show({ message: 'Signed in offline.', type: 'info' });
-          router.replace('/dashboard');
-        } else {
-          Toast.show({ message: 'Please log in online at least once.', type: 'error' });
-        }
+        await tryOfflineLogin(username, password, router);
       }
     } catch {
-      Toast.show({ message: 'Login failed. Check your connection.', type: 'error' });
+      // If network call fails while device claims online, still allow cached offline auth.
+      const didLoginOffline = await tryOfflineLogin(username, password, router);
+      if (!didLoginOffline) {
+        Toast.show({ message: 'Login failed. Check your connection.', type: 'error' });
+      }
     } finally {
       setLoading(false);
     }

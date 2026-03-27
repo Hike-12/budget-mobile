@@ -36,6 +36,35 @@ export default function DashboardScreen() {
   const [filterYear, setFilterYear] = useState('All');
   const [filterRange, setFilterRange] = useState('all');
   const [page, setPage] = useState(1);
+  const [activeTab, setActiveTab] = useState('transactions');
+
+  const releaseNotes = useMemo(() => ([
+    {
+      version: 'v1.1.1',
+      date: '2026-03-27',
+      notes: [
+        'Improved custom calendar date picker with DD/MM/YYYY format and outside-tap close.',
+        'Fixed repeated delete sync 404 errors after login by improving offline queue handling.',
+        'Release notes tab polish and OTA-safe UI updates.',
+      ],
+    },
+    {
+      version: 'v1.1.0',
+      date: '2026-03-27',
+      notes: [
+        'OTA updates enabled for faster app improvements.',
+        'Improved sync reliability with retry and backoff.',
+        'Added transaction date editing support.',
+      ],
+    },
+    {
+      version: 'v1.0.0',
+      date: '2026-03-20',
+      notes: [
+        'Initial release of Budgetly mobile app.',
+      ],
+    },
+  ]), []);
 
   const router = useRouter();
   const { privacyMode, togglePrivacy } = usePrivacy();
@@ -253,6 +282,23 @@ export default function DashboardScreen() {
     </>
   ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router]);
 
+  const releaseNotesContent = useMemo(() => (
+    <View style={styles.releaseTabContainer}>
+      <View style={styles.releaseTabHeader}>
+        <Text style={styles.releaseTabTitle}>Release Notes</Text>
+        <Text style={styles.releaseTabSubtitle}>What changed in recent versions</Text>
+      </View>
+      {releaseNotes.map((entry) => (
+        <View key={entry.version} style={styles.releaseEntryCard}>
+          <Text style={styles.releaseVersion}>{entry.version} • {entry.date}</Text>
+          {entry.notes.map((note, idx) => (
+            <Text key={`${entry.version}-${idx}`} style={styles.releaseNote}>• {note}</Text>
+          ))}
+        </View>
+      ))}
+    </View>
+  ), [releaseNotes]);
+
   const listFooter = useMemo(() => {
     if (filteredCount === 0) return null;
     return (
@@ -284,45 +330,78 @@ export default function DashboardScreen() {
         options={{
           title: 'Dashboard',
           headerRight: () => (
-            <TouchableOpacity
-              onPress={togglePrivacy}
-              hitSlop={12}
-              style={{ marginRight: 4 }}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={privacyMode ? 'eye-off-outline' : 'eye-outline'}
-                size={22}
-                color={Colors.accent}
-              />
-            </TouchableOpacity>
+            <View style={styles.headerActions}>
+              <TouchableOpacity
+                onPress={togglePrivacy}
+                hitSlop={12}
+                style={styles.headerIconButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={privacyMode ? 'eye-off-outline' : 'eye-outline'}
+                  size={22}
+                  color={Colors.accent}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setActiveTab(prev => prev === 'transactions' ? 'release-notes' : 'transactions')}
+                hitSlop={12}
+                style={styles.headerIconButton}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={activeTab === 'release-notes' ? 'newspaper' : 'newspaper-outline'}
+                  size={21}
+                  color={activeTab === 'release-notes' ? Colors.primary : Colors.accent}
+                />
+              </TouchableOpacity>
+            </View>
           ),
         }}
       />
-      <FlatList
-        data={paginatedBudgets}
-        renderItem={renderItem}
-        keyExtractor={keyExtractor}
-        ListHeaderComponent={listHeader}
-        ListFooterComponent={listFooter}
-        ListEmptyComponent={listEmpty}
-        contentContainerStyle={styles.listContent}
-        style={styles.container}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Colors.primary}
-            colors={[Colors.primary]}
-          />
-        }
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews={Platform.OS === 'android'}
-        maxToRenderPerBatch={10}
-        windowSize={5}
-        initialNumToRender={PAGE_SIZE}
-        updateCellsBatchingPeriod={50}
-      />
+      {activeTab === 'release-notes' ? (
+        <FlatList
+          data={[]}
+          keyExtractor={(_, index) => String(index)}
+          ListHeaderComponent={releaseNotesContent}
+          contentContainerStyle={styles.listContent}
+          style={styles.container}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+        />
+      ) : (
+        <FlatList
+          data={paginatedBudgets}
+          renderItem={renderItem}
+          keyExtractor={keyExtractor}
+          ListHeaderComponent={listHeader}
+          ListFooterComponent={listFooter}
+          ListEmptyComponent={listEmpty}
+          contentContainerStyle={styles.listContent}
+          style={styles.container}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={Colors.primary}
+              colors={[Colors.primary]}
+            />
+          }
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews={Platform.OS === 'android'}
+          maxToRenderPerBatch={10}
+          windowSize={5}
+          initialNumToRender={PAGE_SIZE}
+          updateCellsBatchingPeriod={50}
+        />
+      )}
     </>
   );
 }
@@ -350,6 +429,52 @@ const styles = StyleSheet.create({
     color: Colors.warning,
     fontSize: 12,
     fontWeight: '500',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerIconButton: {
+    marginRight: 6,
+  },
+  releaseTabContainer: {
+    gap: 10,
+    marginTop: 4,
+  },
+  releaseTabHeader: {
+    marginBottom: 2,
+  },
+  releaseTabTitle: {
+    color: Colors.accent,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  releaseTabSubtitle: {
+    color: Colors.secondary,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  releaseEntryCard: {
+    backgroundColor: Colors.card,
+    borderColor: Colors.border,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  releaseEntry: {
+    gap: 4,
+  },
+  releaseVersion: {
+    color: Colors.accent,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  releaseNote: {
+    color: Colors.secondary,
+    fontSize: 12,
+    lineHeight: 17,
   },
   searchContainer: {
     marginBottom: 12,

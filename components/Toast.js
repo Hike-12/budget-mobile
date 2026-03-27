@@ -62,7 +62,6 @@ export const ToastView = React.forwardRef(function ToastView(_, ref) {
                 styles.container,
                 { backgroundColor: variant.bg, transform: [{ translateY }], opacity },
             ]}
-            pointerEvents="none"
         >
             <Ionicons name={variant.icon} size={18} color="#fff" />
             <Text style={styles.message}>{state.message}</Text>
@@ -79,16 +78,21 @@ const styles = StyleSheet.create({
         left: 16,
         right: 16,
         zIndex: 9999,
+        pointerEvents: 'none',
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 12,
         gap: 10,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.25,
-        shadowRadius: 8,
+        ...(Platform.OS === 'web'
+            ? { boxShadow: '0px 4px 12px rgba(0,0,0,0.25)' }
+            : {
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.25,
+                shadowRadius: 8,
+            }),
         elevation: 12,
     },
     icon: {
