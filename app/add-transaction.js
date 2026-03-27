@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -65,6 +65,12 @@ export default function AddTransactionScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateDraft, setDateDraft] = useState(getDateParts(initialDate));
   const [loading, setLoading] = useState(false);
+  const submitInFlightRef = useRef(false);
+  const draftBudgetIdRef = useRef(
+    isEdit && params._id
+      ? String(params._id)
+      : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  );
   const router = useRouter();
 
   const openDatePicker = useCallback(() => {
@@ -118,6 +124,8 @@ export default function AddTransactionScreen() {
   }, []);
 
   const handleSubmit = useCallback(async () => {
+    if (submitInFlightRef.current) return;
+
     if (!title.trim() || !amount.trim()) {
       Toast.show({ message: 'Please fill in title and amount.', type: 'warning' });
       return;
@@ -134,11 +142,10 @@ export default function AddTransactionScreen() {
     }
 
     try {
+      submitInFlightRef.current = true;
       setLoading(true);
       const user = await AsyncStorage.getItem('username');
-      const budgetId = isEdit && params._id
-        ? params._id
-        : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+      const budgetId = draftBudgetIdRef.current;
 
       const budget = {
         title: title.trim(),
@@ -159,7 +166,12 @@ export default function AddTransactionScreen() {
       if (isEdit) {
         budgetsArr = budgetsArr.map(b => b._id === budgetId ? budget : b);
       } else {
-        budgetsArr.push(budget);
+        const existingIndex = budgetsArr.findIndex(b => b._id === budgetId);
+        if (existingIndex >= 0) {
+          budgetsArr[existingIndex] = budget;
+        } else {
+          budgetsArr.push(budget);
+        }
       }
       await AsyncStorage.setItem('budgets', JSON.stringify(budgetsArr));
 
@@ -188,9 +200,10 @@ export default function AddTransactionScreen() {
     } catch {
       Toast.show({ message: isEdit ? 'Failed to update transaction.' : 'Failed to add transaction.', type: 'error' });
     } finally {
+      submitInFlightRef.current = false;
       setLoading(false);
     }
-  }, [title, amount, type, category, note, selectedDate, isEdit, params, router]);
+  }, [title, amount, type, category, note, selectedDate, isEdit, router]);
 
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
