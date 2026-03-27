@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Toast } from '../components/Toast';
 import Colors from '../constants/colors';
-import { syncWithServer } from '../utils/sync';
+import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
 
 const categories = ['school friends', 'college friends', 'religion', 'personal', 'miscellaneous'];
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -175,17 +175,9 @@ export default function AddTransactionScreen() {
       }
       await AsyncStorage.setItem('budgets', JSON.stringify(budgetsArr));
 
-      // Queue for sync
-      const queueRaw = await AsyncStorage.getItem('unsynced');
-      const unsynced = queueRaw ? JSON.parse(queueRaw) : [];
+      // Queue for sync (using the canonical dedup utility)
       const action = isEdit ? 'edit' : 'add';
-      const alreadyQueued = unsynced.some(item =>
-        item.action === action && item.budget?._id === budgetId
-      );
-      if (!alreadyQueued) {
-        unsynced.push({ action, budget });
-        await AsyncStorage.setItem('unsynced', JSON.stringify(unsynced));
-      }
+      await addToUnsyncedQueue({ action, budget });
 
       // Sync if online
       const netState = await NetInfo.fetch();

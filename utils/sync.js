@@ -62,6 +62,13 @@ function dedupeQueue(queue) {
 }
 
 /**
+ * Module-level sync lock.  Prevents concurrent invocations of syncWithServer
+ * from any caller (NetInfo listener, add-transaction, pull-to-refresh, etc.).
+ * If a second call arrives while one is running, it awaits the in-flight one.
+ */
+let _syncPromise = null;
+
+/**
  * Syncs the local unsynced queue with the remote server.
  * Returns the fresh server budget list on success, or null on failure.
  *
@@ -69,6 +76,17 @@ function dedupeQueue(queue) {
  * @returns {Promise<Array|null>} the latest server budgets, or null
  */
 export async function syncWithServer(user) {
+    // If a sync is already in progress, piggyback onto it
+    if (_syncPromise) return _syncPromise;
+    _syncPromise = _syncWithServerInner(user);
+    try {
+        return await _syncPromise;
+    } finally {
+        _syncPromise = null;
+    }
+}
+
+async function _syncWithServerInner(user) {
     if (!user) user = await AsyncStorage.getItem('username');
     if (!user) return null;
 
@@ -86,9 +104,11 @@ export async function syncWithServer(user) {
         return null; // network issue — bail without losing queue
     }
 
-    const serverByClientId = new Set(
-        serverList.filter(b => b.clientId).map(b => b.clientId)
+    // Map from clientId → full server doc (so edit/delete can find the real _id)
+    const serverByClientId = new Map(
+        serverList.filter(b => b.clientId).map(b => [b.clientId, b])
     );
+    // Set of raw _ids for delete lookups by non-clientId transactions
     const serverById = new Set(
         serverList.filter(b => b._id).map(b => String(b._id))
     );
@@ -96,37 +116,60 @@ export async function syncWithServer(user) {
     const failedQueue = [];
 
     for (const change of unsynced) {
+        const clientId = change.action === 'delete' ? change.id : change.budget?._id;
+        // Stable, content-addressed idempotency key — same key on every retry for this item.
+        // Uses updatedAt so edits to the same doc get a fresh key after each change.
+        const version = change.budget?.updatedAt || change.budget?.createdAt || '';
+        const idempotencyKey = makeIdempotencyKey(change.action, normalizedUser, clientId, version);
+
         try {
             if (change.action === 'add') {
-                const clientId = change.budget._id;
                 if (!serverByClientId.has(clientId)) {
-                    const payload = {
-                        ...change.budget,
-                        clientId,
-                        user: normalizedUser,
-                        updatedAt: change.budget.updatedAt || new Date().toISOString(),
-                    };
-                    await withRetry(() => axios.post(`${API_URL}/api/budgets`, payload, {
-                        headers: {
-                            'X-Idempotency-Key': makeIdempotencyKey('add', normalizedUser, clientId, payload.updatedAt),
-                        },
-                    }));
-                    serverByClientId.add(clientId);
+                    await withRetry(async () => {
+                        const response = await fetch(`${API_URL}/api/budgets`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Idempotency-Key': idempotencyKey,
+                            },
+                            body: JSON.stringify({
+                                ...change.budget,
+                                clientId,
+                                user: normalizedUser,
+                                updatedAt: change.budget.updatedAt || new Date().toISOString(),
+                            }),
+                        });
+                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    });
+                    // Optimistically mark as synced so a subsequent edit in same cycle can find it.
+                    // We don't have the server's _id yet, so edit will be skipped until next full sync.
+                    serverByClientId.set(clientId, null);
                 }
             } else if (change.action === 'edit') {
-                const clientId = change.budget._id;
-                const payload = {
-                    ...change.budget,
-                    clientId,
-                    user: normalizedUser,
-                    id: clientId,
-                    updatedAt: change.budget.updatedAt || new Date().toISOString(),
-                };
-                await withRetry(() => axios.patch(`${API_URL}/api/budgets`, payload, {
-                    headers: {
-                        'X-Idempotency-Key': makeIdempotencyKey('edit', normalizedUser, clientId, payload.updatedAt),
-                    },
-                }));
+                const serverDoc = serverByClientId.get(clientId);
+                if (serverDoc) {
+                    await withRetry(async () => {
+                        const response = await fetch(`${API_URL}/api/budgets/${serverDoc._id}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'X-Idempotency-Key': idempotencyKey,
+                            },
+                            body: JSON.stringify({
+                                ...change.budget,
+                                user: normalizedUser,
+                                updatedAt: change.budget.updatedAt || new Date().toISOString(),
+                            }),
+                        });
+                        if (!response.ok) {
+                            // Conflict means server has a newer update; keep server truth and drop local edit.
+                            if (response.status === 409) {
+                                throw new Error('Conflict');
+                            }
+                            throw new Error(`HTTP error! status: ${response.status}`);
+                        }
+                    });
+                }
             } else if (change.action === 'delete') {
                 const stableId = change.id;
                 const existsOnServer = serverByClientId.has(stableId) || serverById.has(String(stableId));

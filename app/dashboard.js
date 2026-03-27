@@ -27,7 +27,6 @@ export default function DashboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const isOnlineRef = useRef(true);
   const [isOnline, setIsOnline] = useState(true);
-  const syncingRef = useRef(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
@@ -77,14 +76,9 @@ export default function DashboardScreen() {
   // --- Network & data loading ---
 
   const doSync = useCallback(async () => {
-    if (syncingRef.current) return;
-    syncingRef.current = true;
-    try {
-      const result = await syncWithServer();
-      if (result) setBudgets(result);
-    } finally {
-      syncingRef.current = false;
-    }
+    // syncWithServer has its own internal lock to prevent concurrent runs
+    const result = await syncWithServer();
+    if (result) setBudgets(result);
   }, []);
 
   useEffect(() => {
