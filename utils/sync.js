@@ -104,13 +104,13 @@ async function _syncWithServerInner(user) {
         return null; // network issue — bail without losing queue
     }
 
-    // Map from clientId → full server doc (so edit/delete can find the real _id)
+    // Map from clientId → full server doc
     const serverByClientId = new Map(
         serverList.filter(b => b.clientId).map(b => [b.clientId, b])
     );
-    // Set of raw _ids for delete lookups by non-clientId transactions
-    const serverById = new Set(
-        serverList.filter(b => b._id).map(b => String(b._id))
+    // Map from _id → full server doc (for lookups by MongoDB _id)
+    const serverById = new Map(
+        serverList.filter(b => b._id).map(b => [String(b._id), b])
     );
 
     const failedQueue = [];
@@ -146,23 +146,26 @@ async function _syncWithServerInner(user) {
                     serverByClientId.set(clientId, null);
                 }
             } else if (change.action === 'edit') {
-                const serverDoc = serverByClientId.get(clientId);
+                let serverDoc = serverByClientId.get(clientId);
+                if (!serverDoc && String(clientId).match(/^[0-9a-f]{24}$/i)) {
+                    serverDoc = serverById.get(String(clientId));
+                }
                 if (serverDoc) {
                     await withRetry(async () => {
-                        const response = await fetch(`${API_URL}/api/budgets/${serverDoc._id}`, {
-                            method: 'PUT',
+                        const response = await fetch(`${API_URL}/api/budgets`, {
+                            method: 'PATCH',
                             headers: {
                                 'Content-Type': 'application/json',
                                 'X-Idempotency-Key': idempotencyKey,
                             },
                             body: JSON.stringify({
                                 ...change.budget,
+                                id: serverDoc._id,
                                 user: normalizedUser,
                                 updatedAt: change.budget.updatedAt || new Date().toISOString(),
                             }),
                         });
                         if (!response.ok) {
-                            // Conflict means server has a newer update; keep server truth and drop local edit.
                             if (response.status === 409) {
                                 throw new Error('Conflict');
                             }
