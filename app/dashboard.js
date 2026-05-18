@@ -24,6 +24,15 @@ import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
 
 const releaseNotes = [
   {
+    version: 'v1.2.0',
+    date: '2026-05-18',
+    notes: [
+      'Android keyboard no longer overlaps inputs (KeyboardAvoidingView fix).',
+      'Search now runs after 300ms pause, no more lag on every keystroke.',
+      'Sync reliability improved — username passed explicitly to server sync.',
+    ],
+  },
+  {
     version: 'v1.1.1',
     date: '2026-03-27',
     notes: [
@@ -54,8 +63,10 @@ export default function DashboardScreen() {
   const [budgets, setBudgets] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
+  const [username, setUsername] = useState(null);
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterCategory, setFilterCategory] = useState('All');
   const [filterMonth, setFilterMonth] = useState('0');
@@ -67,13 +78,18 @@ export default function DashboardScreen() {
   const router = useRouter();
   const { privacyMode, togglePrivacy } = usePrivacy();
 
+  // --- Debounce search ---
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // --- Network & data loading ---
 
   const doSync = useCallback(async () => {
-    // syncWithServer has its own internal lock to prevent concurrent runs
-    const result = await syncWithServer();
+    const result = await syncWithServer(username);
     if (result) setBudgets(result);
-  }, []);
+  }, [username]);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
@@ -91,6 +107,7 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     loadBudgetsLocal();
+    AsyncStorage.getItem('username').then(u => setUsername(u || null));
   }, []);
 
   const loadBudgetsLocal = useCallback(async () => {
@@ -140,9 +157,9 @@ export default function DashboardScreen() {
   const filteredBudgets = useMemo(() => {
     let arr = budgets;
 
-    // Search
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase().trim();
+    // Search (debounced)
+    if (debouncedSearch.trim()) {
+      const q = debouncedSearch.toLowerCase().trim();
       arr = arr.filter(b =>
         b.title.toLowerCase().includes(q) ||
         b.category.toLowerCase().includes(q) ||
@@ -180,14 +197,14 @@ export default function DashboardScreen() {
       });
     }
     return arr;
-  }, [budgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange]);
+  }, [budgets, debouncedSearch, filterType, filterCategory, filterMonth, filterYear, filterRange]);
 
   // --- Pagination ---
 
   // Reset page when filters/search change
   useEffect(() => {
     setPage(1);
-  }, [searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange]);
+  }, [debouncedSearch, filterType, filterCategory, filterMonth, filterYear, filterRange]);
 
   const totalPages = Math.max(1, Math.ceil(filteredBudgets.length / PAGE_SIZE));
   const paginatedBudgets = useMemo(() => {

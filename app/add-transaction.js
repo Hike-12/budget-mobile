@@ -198,7 +198,7 @@ export default function AddTransactionScreen() {
   }, [title, amount, type, category, note, selectedDate, isEdit, router]);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
       <Stack.Screen options={{ title: isEdit ? 'Edit Transaction' : 'Add Transaction' }} />
       <ScrollView
         style={styles.container}
