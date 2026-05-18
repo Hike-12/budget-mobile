@@ -92,15 +92,10 @@ async function _syncWithServerInner(user) {
 
     const failedQueue = [];
     const isConnectivityDrop = (error) => {
-        const message = String(error?.message || '').toLowerCase();
         return (
-            !error?.response &&
-            (
-                message.includes('network') ||
-                message.includes('failed to fetch') ||
-                message.includes('request failed') ||
-                message.includes('timeout')
-            )
+            error?.code === 'ERR_NETWORK' ||
+            error?.code === 'ECONNABORTED' ||
+            !error?.response
         );
     };
 
