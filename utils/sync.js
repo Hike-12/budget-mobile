@@ -2,29 +2,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_URL } from '../constants/api';
 
-function sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-function makeIdempotencyKey(action, user, stableId, version = '') {
-    return `${action}:${String(user || '').toLowerCase()}:${stableId}:${version}`;
-}
-
-async function withRetry(task, { retries = 3, baseDelay = 300 } = {}) {
-    let lastError;
-    for (let i = 0; i < retries; i++) {
-        try {
-            return await task();
-        } catch (error) {
-            lastError = error;
-            if (i < retries - 1) {
-                await sleep(baseDelay * (2 ** i));
-            }
-        }
-    }
-    throw lastError;
-}
-
 /**
  * Adds a change to the unsynced queue, deduplicating by action+id.
  * @param {{ action: 'add'|'edit'|'delete', budget?: object, id?: string }} change
@@ -114,32 +91,31 @@ async function _syncWithServerInner(user) {
     );
 
     const failedQueue = [];
+    const isConnectivityDrop = (error) => {
+        const message = String(error?.message || '').toLowerCase();
+        return (
+            !error?.response &&
+            (
+                message.includes('network') ||
+                message.includes('failed to fetch') ||
+                message.includes('request failed') ||
+                message.includes('timeout')
+            )
+        );
+    };
 
-    for (const change of unsynced) {
+    for (let i = 0; i < unsynced.length; i++) {
+        const change = unsynced[i];
         const clientId = change.action === 'delete' ? change.id : change.budget?._id;
-        // Stable, content-addressed idempotency key — same key on every retry for this item.
-        // Uses updatedAt so edits to the same doc get a fresh key after each change.
-        const version = change.budget?.updatedAt || change.budget?.createdAt || '';
-        const idempotencyKey = makeIdempotencyKey(change.action, normalizedUser, clientId, version);
 
         try {
             if (change.action === 'add') {
                 if (!serverByClientId.has(clientId)) {
-                    await withRetry(async () => {
-                        const response = await fetch(`${API_URL}/api/budgets`, {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Idempotency-Key': idempotencyKey,
-                            },
-                            body: JSON.stringify({
-                                ...change.budget,
-                                clientId,
-                                user: normalizedUser,
-                                updatedAt: change.budget.updatedAt || new Date().toISOString(),
-                            }),
-                        });
-                        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    await axios.post(`${API_URL}/api/budgets`, {
+                        ...change.budget,
+                        clientId,
+                        user: normalizedUser,
+                        updatedAt: change.budget.updatedAt || new Date().toISOString(),
                     });
                     // Optimistically mark as synced so a subsequent edit in same cycle can find it.
                     // We don't have the server's _id yet, so edit will be skipped until next full sync.
@@ -151,26 +127,11 @@ async function _syncWithServerInner(user) {
                     serverDoc = serverById.get(String(clientId));
                 }
                 if (serverDoc) {
-                    await withRetry(async () => {
-                        const response = await fetch(`${API_URL}/api/budgets`, {
-                            method: 'PATCH',
-                            headers: {
-                                'Content-Type': 'application/json',
-                                'X-Idempotency-Key': idempotencyKey,
-                            },
-                            body: JSON.stringify({
-                                ...change.budget,
-                                id: serverDoc._id,
-                                user: normalizedUser,
-                                updatedAt: change.budget.updatedAt || new Date().toISOString(),
-                            }),
-                        });
-                        if (!response.ok) {
-                            if (response.status === 409) {
-                                throw new Error('Conflict');
-                            }
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
+                    await axios.patch(`${API_URL}/api/budgets`, {
+                        ...change.budget,
+                        id: serverDoc._id,
+                        user: normalizedUser,
+                        updatedAt: change.budget.updatedAt || new Date().toISOString(),
                     });
                 }
             } else if (change.action === 'delete') {
@@ -182,24 +143,21 @@ async function _syncWithServerInner(user) {
                     continue;
                 }
 
-                await withRetry(() => axios.delete(`${API_URL}/api/budgets`, {
+                await axios.delete(`${API_URL}/api/budgets`, {
                     data: { id: stableId, clientId: stableId, user: normalizedUser },
-                    headers: {
-                        'X-Idempotency-Key': makeIdempotencyKey('delete', normalizedUser, stableId),
-                    },
-                }));
+                });
 
                 serverByClientId.delete(stableId);
                 serverById.delete(String(stableId));
             }
         } catch (error) {
-            // Conflict means server has a newer update; keep server truth and drop local edit.
-            if (error?.response?.status === 409 && change.action === 'edit') {
-                continue;
-            }
             // DELETE is idempotent: missing record means it's already deleted.
             if (error?.response?.status === 404 && change.action === 'delete') {
                 continue;
+            }
+            if (isConnectivityDrop(error)) {
+                failedQueue.push(change, ...unsynced.slice(i + 1));
+                break;
             }
             failedQueue.push(change);
         }
