@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Stack, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Platform,
@@ -22,10 +22,37 @@ import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
 
+const releaseNotes = [
+  {
+    version: 'v1.1.1',
+    date: '2026-03-27',
+    notes: [
+      'Improved custom calendar date picker with DD/MM/YYYY format and outside-tap close.',
+      'Fixed repeated delete sync 404 errors after login by improving offline queue handling.',
+      'Release notes tab polish and OTA-safe UI updates.',
+    ],
+  },
+  {
+    version: 'v1.1.0',
+    date: '2026-03-27',
+    notes: [
+      'OTA updates enabled for faster app improvements.',
+      'Improved sync reliability with retry and backoff.',
+      'Added transaction date editing support.',
+    ],
+  },
+  {
+    version: 'v1.0.0',
+    date: '2026-03-20',
+    notes: [
+      'Initial release of Budgetly mobile app.',
+    ],
+  },
+];
+
 export default function DashboardScreen() {
   const [budgets, setBudgets] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const isOnlineRef = useRef(true);
   const [isOnline, setIsOnline] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,41 +64,8 @@ export default function DashboardScreen() {
   const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState('transactions');
 
-  const releaseNotes = useMemo(() => ([
-    {
-      version: 'v1.1.1',
-      date: '2026-03-27',
-      notes: [
-        'Improved custom calendar date picker with DD/MM/YYYY format and outside-tap close.',
-        'Fixed repeated delete sync 404 errors after login by improving offline queue handling.',
-        'Release notes tab polish and OTA-safe UI updates.',
-      ],
-    },
-    {
-      version: 'v1.1.0',
-      date: '2026-03-27',
-      notes: [
-        'OTA updates enabled for faster app improvements.',
-        'Improved sync reliability with retry and backoff.',
-        'Added transaction date editing support.',
-      ],
-    },
-    {
-      version: 'v1.0.0',
-      date: '2026-03-20',
-      notes: [
-        'Initial release of Budgetly mobile app.',
-      ],
-    },
-  ]), []);
-
   const router = useRouter();
   const { privacyMode, togglePrivacy } = usePrivacy();
-
-  // Keep ref in sync to avoid stale closures in NetInfo listener
-  useEffect(() => {
-    isOnlineRef.current = isOnline;
-  }, [isOnline]);
 
   // --- Network & data loading ---
 
@@ -83,12 +77,14 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener(state => {
-      const wasOffline = !isOnlineRef.current;
-      setIsOnline(state.isConnected);
-      if (state.isConnected) {
-        if (wasOffline) Toast.show({ message: 'Back online. Syncing...', type: 'info' });
-        doSync();
-      }
+      const nextIsOnline = Boolean(state.isConnected);
+      setIsOnline(prevIsOnline => {
+        if (!prevIsOnline && nextIsOnline) {
+          Toast.show({ message: 'Back online. Syncing...', type: 'info' });
+          doSync();
+        }
+        return nextIsOnline;
+      });
     });
     return unsubscribe;
   }, [doSync]);
@@ -134,10 +130,10 @@ export default function DashboardScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (isOnlineRef.current) await doSync();
+    if (isOnline) await doSync();
     else await loadBudgetsLocal();
     setRefreshing(false);
-  }, [doSync, loadBudgetsLocal]);
+  }, [doSync, isOnline, loadBudgetsLocal]);
 
   // --- Filtering & Search ---
 
