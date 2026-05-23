@@ -82,6 +82,8 @@ export default function AddTransactionScreen() {
   const [loading, setLoading] = useState(false);
   const [calcExpr, setCalcExpr] = useState(null);
   const [calcResult, setCalcResult] = useState(null);
+  const [convertedFrom, setConvertedFrom] = useState(null);
+  const [convertedTo, setConvertedTo] = useState(null);
   const calcTimeoutRef = useRef(null);
   const amountRef = useRef(amount);
   const submitInFlightRef = useRef(false);
@@ -103,20 +105,41 @@ export default function AddTransactionScreen() {
   const handleAmountChange = useCallback((value) => {
     setAmount(value);
     if (calcTimeoutRef.current) clearTimeout(calcTimeoutRef.current);
+
+    // Reconstruct full expression if continuing from a previous conversion
+    let displayExpr = value;
+    if (convertedFrom && convertedTo && value.startsWith(convertedTo)) {
+      const rest = value.slice(convertedTo.length);
+      if (rest && /^[+\-*/]/.test(rest)) {
+        displayExpr = convertedFrom + rest;
+      } else {
+        setConvertedFrom(null);
+        setConvertedTo(null);
+      }
+    } else if (convertedFrom) {
+      setConvertedFrom(null);
+      setConvertedTo(null);
+    }
+
     if (value && /[+\-*/]/.test(value)) {
-      const result = calcPreview(value);
+      // If value ends with an operator, user is mid-expression — keep current preview
+      if (/[+\-*/]$/.test(value)) return;
+
+      const result = calcPreview(displayExpr);
       if (result !== null) {
-        setCalcExpr(value);
+        setCalcExpr(displayExpr);
         setCalcResult(result);
         calcTimeoutRef.current = setTimeout(() => {
           setAmount(String(result));
+          setConvertedFrom(displayExpr);
+          setConvertedTo(String(result));
         }, 300);
         return;
       }
     }
     setCalcExpr(null);
     setCalcResult(null);
-  }, []);
+  }, [convertedFrom, convertedTo]);
 
   const router = useRouter();
 
@@ -181,6 +204,8 @@ export default function AddTransactionScreen() {
         setAmount(resolvedAmount);
         setCalcExpr(null);
         setCalcResult(null);
+        setConvertedFrom(null);
+        setConvertedTo(null);
       }
     }
 
@@ -283,13 +308,32 @@ export default function AddTransactionScreen() {
           onChangeText={handleAmountChange}
           onBlur={() => {
             if (calcTimeoutRef.current) clearTimeout(calcTimeoutRef.current);
-            if (amount && /[+\-*/]/.test(amount)) {
-              const result = calcPreview(amount);
-              if (result !== null) setAmount(String(result));
+            const src = calcExpr || amount;
+            if (src && /[+\-*/]/.test(src)) {
+              const result = calcPreview(src);
+              if (result !== null) {
+                setAmount(String(result));
+                setConvertedFrom(src);
+                setConvertedTo(String(result));
+              }
             }
           }}
           returnKeyType="next"
         />
+        {/* Operator buttons for expression entry */}
+        <View style={styles.operatorRow}>
+          {['+', '-', '*', '/'].map(op => (
+            <TouchableOpacity
+              key={op}
+              style={styles.operatorBtn}
+              onPress={() => handleAmountChange(amount + op)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.operatorBtnText}>{op}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
         <View style={styles.calcPreviewContainer}>
           {calcExpr !== null && (
             <Text style={styles.calcPreviewText}>{calcExpr} = {calcResult}</Text>
@@ -574,6 +618,27 @@ const styles = StyleSheet.create({
   },
   modalPrimaryBtnText: {
     color: Colors.dark,
+    fontWeight: '600',
+  },
+  operatorRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 10,
+    marginTop: 2,
+  },
+  operatorBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: Colors.primary + '20',
+    borderColor: Colors.secondary,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  operatorBtnText: {
+    color: Colors.accent,
+    fontSize: 18,
     fontWeight: '600',
   },
   calcPreviewContainer: {
