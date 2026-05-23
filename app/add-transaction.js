@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -50,6 +50,21 @@ const getDateParts = (date) => ({
   day: date.getDate(),
 });
 
+function calcPreview(expr) {
+  if (!expr || !/[+\-*/]/.test(expr)) return null;
+  const sanitized = expr.replace(/[^0-9.+\-*/]/g, '').trim();
+  if (!sanitized) return null;
+  try {
+    const result = Function(`"use strict"; return (${sanitized})`)();
+    if (typeof result === 'number' && isFinite(result)) {
+      return Math.round(result * 100) / 100;
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default function AddTransactionScreen() {
   const params = useLocalSearchParams();
   const isEdit = params.edit === 'true';
@@ -65,12 +80,44 @@ export default function AddTransactionScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateDraft, setDateDraft] = useState(getDateParts(initialDate));
   const [loading, setLoading] = useState(false);
+  const [calcExpr, setCalcExpr] = useState(null);
+  const [calcResult, setCalcResult] = useState(null);
+  const calcTimeoutRef = useRef(null);
+  const amountRef = useRef(amount);
   const submitInFlightRef = useRef(false);
   const draftBudgetIdRef = useRef(
     isEdit && params._id
       ? String(params._id)
       : `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
   );
+  useEffect(() => {
+    amountRef.current = amount;
+  }, [amount]);
+
+  useEffect(() => {
+    return () => {
+      if (calcTimeoutRef.current) clearTimeout(calcTimeoutRef.current);
+    };
+  }, []);
+
+  const handleAmountChange = useCallback((value) => {
+    setAmount(value);
+    if (calcTimeoutRef.current) clearTimeout(calcTimeoutRef.current);
+    if (value && /[+\-*/]/.test(value)) {
+      const result = calcPreview(value);
+      if (result !== null) {
+        setCalcExpr(value);
+        setCalcResult(result);
+        calcTimeoutRef.current = setTimeout(() => {
+          setAmount(String(result));
+        }, 300);
+        return;
+      }
+    }
+    setCalcExpr(null);
+    setCalcResult(null);
+  }, []);
+
   const router = useRouter();
 
   const openDatePicker = useCallback(() => {
@@ -126,11 +173,22 @@ export default function AddTransactionScreen() {
   const handleSubmit = useCallback(async () => {
     if (submitInFlightRef.current) return;
 
-    if (!title.trim() || !amount.trim()) {
+    let resolvedAmount = amount;
+    if (resolvedAmount && /[+\-*/]/.test(resolvedAmount)) {
+      const evaled = calcPreview(resolvedAmount);
+      if (evaled !== null) {
+        resolvedAmount = String(evaled);
+        setAmount(resolvedAmount);
+        setCalcExpr(null);
+        setCalcResult(null);
+      }
+    }
+
+    if (!title.trim() || !resolvedAmount.trim()) {
       Toast.show({ message: 'Please fill in title and amount.', type: 'warning' });
       return;
     }
-    const numAmount = Number(amount);
+    const numAmount = Number(resolvedAmount);
     if (isNaN(numAmount) || numAmount <= 0) {
       Toast.show({ message: 'Please enter a valid amount.', type: 'warning' });
       return;
@@ -222,9 +280,21 @@ export default function AddTransactionScreen() {
           placeholderTextColor={Colors.secondary}
           keyboardType="numeric"
           value={amount}
-          onChangeText={setAmount}
+          onChangeText={handleAmountChange}
+          onBlur={() => {
+            if (calcTimeoutRef.current) clearTimeout(calcTimeoutRef.current);
+            if (amount && /[+\-*/]/.test(amount)) {
+              const result = calcPreview(amount);
+              if (result !== null) setAmount(String(result));
+            }
+          }}
           returnKeyType="next"
         />
+        <View style={styles.calcPreviewContainer}>
+          {calcExpr !== null && (
+            <Text style={styles.calcPreviewText}>{calcExpr} = {calcResult}</Text>
+          )}
+        </View>
 
         <Text style={styles.label}>Date</Text>
         <TouchableOpacity
@@ -504,6 +574,17 @@ const styles = StyleSheet.create({
   },
   modalPrimaryBtnText: {
     color: Colors.dark,
+    fontWeight: '600',
+  },
+  calcPreviewContainer: {
+    height: 20,
+    marginBottom: 15,
+    paddingLeft: 6,
+    justifyContent: 'center',
+  },
+  calcPreviewText: {
+    color: Colors.primary,
+    fontSize: 13,
     fontWeight: '600',
   },
   textArea: {
