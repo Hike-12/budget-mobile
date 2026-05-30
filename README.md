@@ -1,50 +1,96 @@
-# Welcome to your Expo app 👋
+# Budget Mobile
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Budget Mobile is an Expo + React Native application for tracking income and expenses with an offline-first experience.  
+The app supports secure login, transaction management, filters, local caching, and background sync with a remote API.
 
-## Get started
+## Features
 
-1. Install dependencies
+- **Authentication flow** with online login and cached offline fallback
+- **Transaction management**: add, edit, delete, categorize, and annotate entries
+- **Offline-first behavior** with local persistence via AsyncStorage
+- **Sync queue** to reconcile unsynced actions when connectivity is restored
+- **Search, filtering, and pagination** for fast browsing of transactions
+- **Privacy mode** to hide sensitive balance values in the UI
+- **Release notes tab** embedded in-app for product update visibility
+
+## Tech Stack
+
+- **Framework:** Expo (SDK 54), React Native 0.81, React 19
+- **Routing:** Expo Router
+- **Networking:** Axios
+- **State & Storage:** React hooks + AsyncStorage
+- **Connectivity detection:** @react-native-community/netinfo
+- **Language:** JavaScript
+
+## Project Structure
+
+```text
+app/            Route screens (login, dashboard, add/edit transaction)
+components/     Reusable UI components (cards, filters, toast, modal)
+constants/      App constants (API URL, theme colors, pagination)
+contexts/       Global UI/application context providers
+utils/          Sync and data utility logic
+assets/         Static images and icons
+```
+
+## Prerequisites
+
+- Node.js 18+ (recommended LTS)
+- npm 9+
+- Expo tooling (installed through project dependencies)
+- Android Studio / Xcode / Expo Go (depending on target platform)
+
+## Getting Started
+
+1. **Install dependencies**
 
    ```bash
    npm install
    ```
 
-2. Start the app
+2. **Configure environment (optional)**
+
+   The app reads API base URL from:
 
    ```bash
-   npx expo start
+   EXPO_PUBLIC_API_URL
    ```
 
-In the output, you'll find options to open the app in a
+   If not set, it falls back to:
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+   ```text
+   https://budget-tracker-hike.vercel.app
+   ```
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
+3. **Start the development server**
 
-## Get a fresh project
+   ```bash
+   npm run start
+   ```
 
-When you're ready, run:
+4. **Run on a platform**
 
-```bash
-npm run reset-project
-```
+   ```bash
+   npm run android
+   npm run ios
+   npm run web
+   ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+## Available Scripts
 
-## Learn more
+- `npm run start` — start Expo development server
+- `npm run android` — launch Android target
+- `npm run ios` — launch iOS target
+- `npm run web` — launch web target
+- `npm run lint` — run Expo ESLint checks
 
-To learn more about developing your project with Expo, look at the following resources:
+## Build & Release
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+EAS configuration is provided in `eas.json` with development, preview, and production profiles.  
+OTA updates are enabled via Expo Updates in `app.json`.
 
-## Join the community
+## Notes
 
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- Data is cached locally to support interrupted or offline usage.
+- Unsynced create/edit/delete actions are queued and retried during sync.
+- Current lint output includes existing hook dependency warnings in `app/dashboard.js`.
