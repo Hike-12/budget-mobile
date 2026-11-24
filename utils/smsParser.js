@@ -20,7 +20,7 @@ function guessCategory(merchant) {
 
 function messageDate(text, fallback) {
   const numeric = text.match(/\b(\d{1,2})[-/](\d{1,2})[-/](\d{4}|\d{2})\b/);
-  const named = text.match(/\b(\d{1,2})[- ]([A-Za-z]{3})[- ](\d{4}|\d{2})\b/);
+  const named = text.match(/\b(\d{1,2})[- ]?([A-Za-z]{3})[- ]?(\d{4}|\d{2})\b/);
   const iso = text.match(/\b(\d{4})-(\d{2})-(\d{2})\b/);
   if (!numeric && !named && !iso) return fallback;
   const months = 'jan feb mar apr may jun jul aug sep oct nov dec'.split(' ');
@@ -48,7 +48,7 @@ export function parseUpiAlert(raw, receivedAt = Date.now(), categories = {}) {
   const afterAmount = text.slice(amountMatch.index + amountMatch[0].length);
   const party = type === 'income' ? /\bfrom\s+(.+)/i : /\b(?:to|at|towards)\s+(.+)/i;
   const tail = afterAmount.replace(/^\s*(?:debited|credited)\s+(?:to|from)\s+(?:your\s+)?(?:bank\s+)?(?:a\/c|acct|account)\s*[\w*.-]*/i, '');
-  const merchant = (tail.match(party)?.[1] || tail.match(/\b(?:VPA|Info)\s*[:/-]?\s*(.+)/i)?.[1] || '')
+  const merchant = (tail.match(party)?.[1] || tail.match(/\b(?:VPA|Info)\s*[:/-]?\s*(.+)/i)?.[1] || before.match(party)?.[1] || '')
     .split(/\s+(?:on|via|using|with|UPI|Ref(?:erence)?|RRN|Txn|Avl|Balance|VPA)\b|[;,]|\.(?=\s|$)/i)[0]
     .trim()
     .slice(0, 80) || 'UPI transaction';
@@ -64,10 +64,15 @@ export function parseUpiAlert(raw, receivedAt = Date.now(), categories = {}) {
     category: REVIEW_CATEGORIES.includes(remembered) ? remembered : guessCategory(merchant),
     upiRefId,
     createdAt: timestamp.toISOString(),
-    rawSmsSnippet: text.replace(/[\w.+-]+@[\w.-]+/g, '[UPI address]').replace(/[\p{L}\p{N}*]{4,}/gu, (word) => /\d/.test(word) ? '[masked]' : word).slice(0, 180),
+    rawSmsSnippet: text.replace(/[\w.+-]+@[\w.-]+/g, '[UPI address]').replace(/\d+/g, '•').slice(0, 180),
   };
 }
 
-export function captureKey(item) {
-  return item.upiRefId || JSON.stringify([merchantKey(item.title), item.amount, item.type, item.createdAt.slice(0, 10)]);
+export function captureKey(item, alert) {
+  if (item.upiRefId) return item.upiRefId;
+  // Identical inbox messages can describe separate payments received at different times.
+  const body = merchantKey(alert.body);
+  let hash = 2166136261;
+  for (const char of body) hash = Math.imul(hash ^ char.codePointAt(0), 16777619);
+  return `receipt-${alert.timestamp ?? 'paste'}-${(hash >>> 0).toString(36)}`;
 }

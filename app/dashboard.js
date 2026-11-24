@@ -17,6 +17,8 @@ import BudgetCard from '../components/BudgetCard';
 import FilterBar from '../components/FilterBar';
 import { Toast } from '../components/Toast';
 import TotalBalance from '../components/TotalBalance';
+import UpiCaptureControls from '../components/UpiCaptureControls';
+import { useUpiCapture } from '../utils/useUpiCapture';
 import { PAGE_SIZE } from '../constants/api';
 import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
@@ -75,6 +77,8 @@ export default function DashboardScreen() {
   const [page, setPage] = useState(1);
   const [activeTab, setActiveTab] = useState('transactions');
 
+  const capture = useUpiCapture(username);
+  const refreshCapture = capture.refresh;
   const router = useRouter();
   const { privacyMode, togglePrivacy } = usePrivacy();
 
@@ -105,15 +109,16 @@ export default function DashboardScreen() {
     return unsubscribe;
   }, [doSync]);
 
-  useEffect(() => {
-    loadBudgetsLocal();
-    AsyncStorage.getItem('username').then(u => setUsername(u || null));
-  }, []);
-
   const loadBudgetsLocal = useCallback(async () => {
     const raw = await AsyncStorage.getItem('budgets');
     setBudgets(raw ? JSON.parse(raw) : []);
   }, []);
+
+  useEffect(() => {
+    loadBudgetsLocal();
+    AsyncStorage.getItem('username').then(u => setUsername(u || null));
+  }, [loadBudgetsLocal]);
+
 
   const handleDelete = useCallback(async (id) => {
     setBudgets(prev => prev.filter(b => b._id !== id));
@@ -147,15 +152,15 @@ export default function DashboardScreen() {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    if (isOnline) await doSync();
+    if (isOnline) await Promise.all([doSync(), refreshCapture().catch(() => {})]);
     else await loadBudgetsLocal();
     setRefreshing(false);
-  }, [doSync, isOnline, loadBudgetsLocal]);
+  }, [doSync, isOnline, loadBudgetsLocal, refreshCapture]);
 
   // --- Filtering & Search ---
 
   const filteredBudgets = useMemo(() => {
-    let arr = budgets;
+    let arr = budgets.filter(b => b.status !== 'pending');
 
     // Search (debounced)
     if (debouncedSearch.trim()) {
@@ -237,6 +242,7 @@ export default function DashboardScreen() {
       )}
 
       <TotalBalance budgets={filteredBudgets} />
+      <UpiCaptureControls user={username} capture={capture} onVerified={doSync} />
 
       <FilterBar
         filterType={filterType}
@@ -287,7 +293,7 @@ export default function DashboardScreen() {
         </View>
       )}
     </>
-  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router]);
+  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router, username, capture, doSync]);
 
   const releaseNotesContent = useMemo(() => (
     <View style={styles.releaseTabContainer}>
@@ -304,7 +310,7 @@ export default function DashboardScreen() {
         </View>
       ))}
     </View>
-  ), [releaseNotes]);
+  ), []);
 
   const listFooter = useMemo(() => {
     if (filteredCount === 0) return null;

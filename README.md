@@ -94,3 +94,28 @@ OTA updates are enabled via Expo Updates in `app.json`.
 - Data is cached locally to support interrupted or offline usage.
 - Unsynced create/edit/delete actions are queued and retried during sync.
 - Current lint output includes existing hook dependency warnings in `app/dashboard.js`.
+
+## Verify UPI alerts on Android
+
+1. Install the Android preview APK from Releases. The preview uses a local
+   signing key, so Android may require a separate install if your existing
+   app was signed with a different key. Sync any offline transactions first.
+2. Sign in and open **UPI capture settings** below the balance. The setting starts
+   off. Turn on **Auto-Parse GPay / UPI Alerts** and allow SMS access. For Google
+   Pay notifications, also enable notification access in Android settings.
+3. Tap **Scan Recent UPI SMS** to scan the past seven days, or use
+   **Paste SMS / GPay Receipt**. Paste this fictional example to try the flow:
+
+   "Google Pay: You sent ₹299 to Swiggy. UPI transaction ID: 628412345609"
+
+4. Open **Needs Verification**. Edit the merchant or category and tap
+   **Verify & Add**. The item leaves the queue and appears in the timeline
+   and balance. **Ignore** removes a pending item. Scanning the same UPI
+   reference again on this device skips it.
+5. Expo Go supports paste and review. A native Android APK is required for
+   SMS and notification capture. Alerts received while Budget Mobile is
+   closed are held on the device and sync when the app is next open.
+
+From a clone, run npm ci, npm test, and npx expo lint. To produce an
+EAS-signed preview APK, run eas build -p android --profile preview with
+access to the linked Expo project.

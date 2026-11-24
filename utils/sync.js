@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_URL } from '../constants/api';
+import { captureKey, merchantKey, parseUpiAlert } from './smsParser';
 
 /**
  * Adds a change to the unsynced queue, deduplicating by action+id.
@@ -171,4 +172,87 @@ async function _syncWithServerInner(user) {
 
     await AsyncStorage.setItem('budgets', JSON.stringify(serverList));
     return serverList;
+}
+
+const captureStorageKey = (user) => 'upi-capture:' + user;
+let captureWork = Promise.resolve();
+
+function serializeCapture(work) {
+    const result = captureWork.then(work);
+    captureWork = result.catch(() => {});
+    return result;
+}
+
+async function readCapture(user) {
+    const raw = await AsyncStorage.getItem(captureStorageKey(user));
+    return raw ? JSON.parse(raw) : { processed: {}, outbox: {}, categories: {} };
+}
+
+async function writeCapture(user, state) {
+    await AsyncStorage.setItem(captureStorageKey(user), JSON.stringify(state));
+}
+
+export function stageUpiAlerts(user, alerts) {
+    return serializeCapture(async () => {
+        const state = await readCapture(user);
+        let added = 0;
+        for (const alert of alerts) {
+            const item = parseUpiAlert(alert.body, alert.timestamp, state.categories);
+            if (!item) continue;
+            const key = captureKey(item, alert);
+            if (Object.hasOwn(state.processed, key)) continue;
+            state.processed[key] = 'queued';
+            state.outbox[key] = { ...item, clientId: 'upi-' + key };
+            added++;
+        }
+        if (added) await writeCapture(user, state);
+        return added;
+    });
+}
+
+export function flushUpiAlerts(user) {
+    return serializeCapture(async () => {
+        const state = await readCapture(user);
+        for (const [key, item] of Object.entries(state.outbox)) {
+            await axios.post(API_URL + '/api/budgets', {
+                ...item,
+                user,
+                status: 'pending',
+                source: 'sms_auto',
+                updatedAt: new Date().toISOString(),
+            }, { timeout: 8000 });
+            delete state.outbox[key];
+            state.processed[key] = 'submitted';
+            await writeCapture(user, state);
+        }
+    });
+}
+
+export async function fetchPendingBudgets(user) {
+    const { data } = await axios.get(API_URL + '/api/budgets', {
+        params: { user, status: 'pending' },
+        timeout: 8000,
+    });
+    return data.filter(item => item.status === 'pending');
+}
+
+export function reviewPendingBudget(user, item, edit) {
+    return serializeCapture(async () => {
+        const url = API_URL + '/api/budgets';
+        const target = { user, id: item._id };
+        const state = await readCapture(user);
+        if (edit) {
+            await axios.patch(url, { ...target, ...edit, status: 'verified' });
+            state.categories[merchantKey(item.title)] = edit.category;
+            state.categories[merchantKey(edit.title)] = edit.category;
+        } else {
+            await axios.delete(url, { data: { ...target, pendingOnly: true } });
+        }
+        const key = item.upiRefId || item.clientId?.replace(/^upi-/, '');
+        if (key) {
+            state.processed[key] = edit ? 'verified' : 'ignored';
+            delete state.outbox[key];
+        }
+        await writeCapture(user, state);
+    });
 }
