@@ -17,49 +17,12 @@ import BudgetCard from '../components/BudgetCard';
 import FilterBar from '../components/FilterBar';
 import { Toast } from '../components/Toast';
 import TotalBalance from '../components/TotalBalance';
-import UpiCaptureControls from '../components/UpiCaptureControls';
+import UpiCaptureControls, { PendingUpiBanner } from '../components/UpiCaptureControls';
 import { useUpiCapture } from '../utils/useUpiCapture';
 import { PAGE_SIZE } from '../constants/api';
 import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
-
-const releaseNotes = [
-  {
-    version: 'v1.2.0',
-    date: '2026-05-18',
-    notes: [
-      'Android keyboard no longer overlaps inputs (KeyboardAvoidingView fix).',
-      'Search now runs after 300ms pause, no more lag on every keystroke.',
-      'Sync reliability improved — username passed explicitly to server sync.',
-    ],
-  },
-  {
-    version: 'v1.1.1',
-    date: '2026-03-27',
-    notes: [
-      'Improved custom calendar date picker with DD/MM/YYYY format and outside-tap close.',
-      'Fixed repeated delete sync 404 errors after login by improving offline queue handling.',
-      'Release notes tab polish and OTA-safe UI updates.',
-    ],
-  },
-  {
-    version: 'v1.1.0',
-    date: '2026-03-27',
-    notes: [
-      'OTA updates enabled for faster app improvements.',
-      'Improved sync reliability with retry and backoff.',
-      'Added transaction date editing support.',
-    ],
-  },
-  {
-    version: 'v1.0.0',
-    date: '2026-03-20',
-    notes: [
-      'Initial release of Budgetly mobile app.',
-    ],
-  },
-];
 
 export default function DashboardScreen() {
   const [budgets, setBudgets] = useState([]);
@@ -75,10 +38,11 @@ export default function DashboardScreen() {
   const [filterYear, setFilterYear] = useState('All');
   const [filterRange, setFilterRange] = useState('all');
   const [page, setPage] = useState(1);
-  const [activeTab, setActiveTab] = useState('transactions');
+  const [captureSheet, setCaptureSheet] = useState(null);
 
   const capture = useUpiCapture(username);
   const refreshCapture = capture.refresh;
+  const pendingCount = capture.items.length;
   const router = useRouter();
   const { privacyMode, togglePrivacy } = usePrivacy();
 
@@ -242,7 +206,7 @@ export default function DashboardScreen() {
       )}
 
       <TotalBalance budgets={filteredBudgets} />
-      <UpiCaptureControls user={username} capture={capture} onVerified={doSync} />
+      <PendingUpiBanner count={pendingCount} onPress={() => setCaptureSheet('review')} />
 
       <FilterBar
         filterType={filterType}
@@ -293,24 +257,7 @@ export default function DashboardScreen() {
         </View>
       )}
     </>
-  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router, username, capture, doSync]);
-
-  const releaseNotesContent = useMemo(() => (
-    <View style={styles.releaseTabContainer}>
-      <View style={styles.releaseTabHeader}>
-        <Text style={styles.releaseTabTitle}>Release Notes</Text>
-        <Text style={styles.releaseTabSubtitle}>What changed in recent versions</Text>
-      </View>
-      {releaseNotes.map((entry) => (
-        <View key={entry.version} style={styles.releaseEntryCard}>
-          <Text style={styles.releaseVersion}>{entry.version} • {entry.date}</Text>
-          {entry.notes.map((note, idx) => (
-            <Text key={`${entry.version}-${idx}`} style={styles.releaseNote}>• {note}</Text>
-          ))}
-        </View>
-      ))}
-    </View>
-  ), []);
+  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router, pendingCount]);
 
   const listFooter = useMemo(() => {
     if (filteredCount === 0) return null;
@@ -357,64 +304,48 @@ export default function DashboardScreen() {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setActiveTab(prev => prev === 'transactions' ? 'release-notes' : 'transactions')}
+                onPress={() => setCaptureSheet('settings')}
+                accessibilityRole="button"
+                accessibilityLabel="Settings"
                 hitSlop={12}
                 style={styles.headerIconButton}
                 activeOpacity={0.7}
               >
                 <Ionicons
-                  name={activeTab === 'release-notes' ? 'newspaper' : 'newspaper-outline'}
+                  name="settings-outline"
                   size={21}
-                  color={activeTab === 'release-notes' ? Colors.primary : Colors.accent}
+                  color={Colors.accent}
                 />
               </TouchableOpacity>
             </View>
           ),
         }}
       />
-      {activeTab === 'release-notes' ? (
-        <FlatList
-          data={[]}
-          keyExtractor={(_, index) => String(index)}
-          ListHeaderComponent={releaseNotesContent}
-          contentContainerStyle={styles.listContent}
-          style={styles.container}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-        />
-      ) : (
-        <FlatList
-          data={paginatedBudgets}
-          renderItem={renderItem}
-          keyExtractor={keyExtractor}
-          ListHeaderComponent={listHeader}
-          ListFooterComponent={listFooter}
-          ListEmptyComponent={listEmpty}
-          contentContainerStyle={styles.listContent}
-          style={styles.container}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={Colors.primary}
-              colors={[Colors.primary]}
-            />
-          }
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews={Platform.OS === 'android'}
-          maxToRenderPerBatch={10}
-          windowSize={5}
-          initialNumToRender={PAGE_SIZE}
-          updateCellsBatchingPeriod={50}
-        />
-      )}
+      <FlatList
+        data={paginatedBudgets}
+        renderItem={renderItem}
+        keyExtractor={keyExtractor}
+        ListHeaderComponent={listHeader}
+        ListFooterComponent={listFooter}
+        ListEmptyComponent={listEmpty}
+        contentContainerStyle={styles.listContent}
+        style={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={Colors.primary}
+            colors={[Colors.primary]}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={Platform.OS === 'android'}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        initialNumToRender={PAGE_SIZE}
+        updateCellsBatchingPeriod={50}
+      />
+      <UpiCaptureControls user={username} capture={capture} sheet={captureSheet} setSheet={setCaptureSheet} onVerified={doSync} />
     </>
   );
 }
@@ -449,45 +380,6 @@ const styles = StyleSheet.create({
   },
   headerIconButton: {
     marginRight: 6,
-  },
-  releaseTabContainer: {
-    gap: 10,
-    marginTop: 4,
-  },
-  releaseTabHeader: {
-    marginBottom: 2,
-  },
-  releaseTabTitle: {
-    color: Colors.accent,
-    fontWeight: '600',
-    fontSize: 16,
-  },
-  releaseTabSubtitle: {
-    color: Colors.secondary,
-    fontSize: 12,
-    marginTop: 2,
-  },
-  releaseEntryCard: {
-    backgroundColor: Colors.card,
-    borderColor: Colors.border,
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    gap: 6,
-  },
-  releaseEntry: {
-    gap: 4,
-  },
-  releaseVersion: {
-    color: Colors.accent,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  releaseNote: {
-    color: Colors.secondary,
-    fontSize: 12,
-    lineHeight: 17,
   },
   searchContainer: {
     marginBottom: 12,

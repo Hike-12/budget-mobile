@@ -99,7 +99,7 @@ OTA updates are enabled via Expo Updates in `app.json`.
 
 1. Install the Android preview APK from Releases. It installs as **Budget Mobile
    Preview** alongside the existing app. Sign in to load your synced ledger.
-2. Sign in and open **UPI capture settings** below the balance. The setting starts
+2. Sign in and tap the **Settings** gear on the dashboard. The setting starts
    off. Turn on **Auto-Parse GPay / UPI Alerts** and allow SMS access. For Google
    Pay notifications, also enable notification access in Android settings.
 3. Tap **Scan Recent UPI SMS** to scan the past seven days, or use

@@ -3,14 +3,14 @@ import { KeyboardAvoidingView, Modal, Platform, ScrollView, StyleSheet, Text, Te
 import Colors from '../constants/colors';
 import { REVIEW_CATEGORIES } from '../utils/smsParser';
 
-export function ReviewSheet({ visible, title, onClose, children }) {
+export function ReviewSheet({ visible, title, onClose, closeLabel = 'Done', children }) {
     return (
         <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
             <KeyboardAvoidingView style={styles.backdrop} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
                 <View style={styles.sheet}>
                     <View style={styles.header}>
                         <Text style={styles.heading} accessibilityRole="header">{title}</Text>
-                        <TouchableOpacity onPress={onClose} accessibilityRole="button"><Text style={styles.action}>Done</Text></TouchableOpacity>
+                        <TouchableOpacity onPress={onClose} accessibilityRole="button" hitSlop={8}><Text style={styles.action}>{closeLabel}</Text></TouchableOpacity>
                     </View>
                     <ScrollView keyboardShouldPersistTaps="handled">{children}</ScrollView>
                 </View>
