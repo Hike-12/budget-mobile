@@ -97,9 +97,8 @@ OTA updates are enabled via Expo Updates in `app.json`.
 
 ## Verify UPI alerts on Android
 
-1. Install the Android preview APK from Releases. The preview uses a local
-   signing key, so Android may require a separate install if your existing
-   app was signed with a different key. Sync any offline transactions first.
+1. Install the Android preview APK from Releases. It installs as **Budget Mobile
+   Preview** alongside the existing app. Sign in to load your synced ledger.
 2. Sign in and open **UPI capture settings** below the balance. The setting starts
    off. Turn on **Auto-Parse GPay / UPI Alerts** and allow SMS access. For Google
    Pay notifications, also enable notification access in Android settings.
@@ -119,3 +118,7 @@ OTA updates are enabled via Expo Updates in `app.json`.
 From a clone, run npm ci, npm test, and npx expo lint. To produce an
 EAS-signed preview APK, run eas build -p android --profile preview with
 access to the linked Expo project.
+
+For a side-by-side APK built locally, set `BUDGET_ANDROID_PREVIEW=1`, run
+`npx expo prebuild --platform android`, then run `gradlew.bat :app:assembleRelease`
+from the generated Android directory on Windows.

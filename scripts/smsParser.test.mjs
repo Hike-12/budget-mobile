@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { parseUpiAlert } from '../utils/smsParser.js';
+import { captureKey, parseUpiAlert } from '../utils/smsParser.js';
 
 const time = Date.parse('2026-11-24T08:54:00Z');
 const fixtures = [
@@ -37,4 +37,18 @@ test('remembered category and receipt timestamp', () => {
   const item = parseUpiAlert('Google Pay: You paid ₹300 to Zomato.', time, { zomato: 'Bills' });
   assert.equal(item.category, 'Bills');
   assert.equal(item.createdAt, new Date(time).toISOString());
+});
+
+test('an inbox rescan keeps the same identity without collapsing separate receipts', () => {
+  const alert = { body: 'Google Pay: You paid ₹40 to Cafe.', timestamp: time };
+  const item = parseUpiAlert(alert.body, alert.timestamp);
+  assert.equal(captureKey(item, alert), captureKey(item, { ...alert }));
+  assert.notEqual(captureKey(item, alert), captureKey(item, { ...alert, timestamp: time + 60_000 }));
+});
+
+test('a reference identifies the same payment in an SMS and a GPay notification', () => {
+  const sms = { body: fixtures[0][1], timestamp: time };
+  const notification = { body: 'Google Pay: You paid ₹1,245.50 to Zomato. Ref: 628412345601' };
+  assert.equal(captureKey(parseUpiAlert(sms.body, time), sms),
+    captureKey(parseUpiAlert(notification.body, time), notification));
 });
