@@ -102,7 +102,7 @@ export function useUpiCapture(user) {
         try {
             if (!await requestInboxAccess()) return setMessage('Allow SMS access to scan your inbox.');
             const { added, offline } = await queue(await upiNative.scanRecentSms());
-            setMessage(added ? (offline ? 'New alerts saved on this device. They will sync when you reconnect.' : added + ' new alerts added for review.') : 'No new UPI alerts found.');
+            setMessage(added ? (offline ? 'New alerts saved on this device. They will sync when you reconnect.' : added + ' new alerts added for review.') : 'No new payment alerts found.');
         } catch {
             setMessage('Could not scan recent SMS. You can paste a receipt instead.');
         }

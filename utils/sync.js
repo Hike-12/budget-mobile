@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_URL } from '../constants/api';
-import { captureKey, merchantKey, parseUpiAlert } from './smsParser';
+import { captureKey, merchantKey, parsePaymentAlert } from './smsParser';
 
 /**
  * Adds a change to the unsynced queue, deduplicating by action+id.
@@ -197,7 +197,7 @@ export function stageUpiAlerts(user, alerts) {
         const state = await readCapture(user);
         let added = 0;
         for (const alert of alerts) {
-            const item = parseUpiAlert(alert.body, alert.timestamp, state.categories);
+            const item = parsePaymentAlert(alert.body, alert.timestamp, state.categories);
             if (!item) continue;
             const key = captureKey(item, alert);
             if (Object.hasOwn(state.processed, key)) continue;

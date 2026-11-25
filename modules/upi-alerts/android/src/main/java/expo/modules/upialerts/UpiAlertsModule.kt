@@ -22,11 +22,18 @@ private const val DAY_MS = 86_400_000L
 private object CaptureBuffer {
   private val upi = Regex("""\b(upi|vpa|rrn|gpay|google pay)\b""", RegexOption.IGNORE_CASE)
   private val transfer = Regex("""\b(debited|credited|paid|received|sent|transferred)\b""", RegexOption.IGNORE_CASE)
-  private val ignored = Regex("""\b(otp|declined|failed|requested|refunded|reversed|verification code|payment due|credit card bill)\b""", RegexOption.IGNORE_CASE)
+  private val bankAccount = Regex("""\b(a/c|acct|account)\b""", RegexOption.IGNORE_CASE)
+  private val bankDirection = Regex("""\b(debited|credited|dr|cr)\b""", RegexOption.IGNORE_CASE)
+  private val currencyAmount = Regex("""(?:₹|\b(?:inr|rs\.?))\s*\d""", RegexOption.IGNORE_CASE)
+  private val ignored = Regex("""\b(otp|declined|failed|pending|requested|refunded|reversed|verification code|payment due|credit card bill)\b""", RegexOption.IGNORE_CASE)
 
   private fun prefs(context: Context) = context.getSharedPreferences("upi_alerts", Context.MODE_PRIVATE)
 
-  fun candidate(body: String) = upi.containsMatchIn(body) && transfer.containsMatchIn(body) && !ignored.containsMatchIn(body)
+  fun candidate(body: String): Boolean {
+    if (ignored.containsMatchIn(body)) return false
+    return (upi.containsMatchIn(body) && transfer.containsMatchIn(body)) ||
+      (bankAccount.containsMatchIn(body) && bankDirection.containsMatchIn(body) && currencyAmount.containsMatchIn(body))
+  }
 
   @Synchronized
   fun setOwner(context: Context, user: String?) {

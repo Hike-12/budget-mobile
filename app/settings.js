@@ -8,7 +8,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
 import { useCaptureSession } from '../contexts/UpiCaptureContext';
-import { parseUpiAlert } from '../utils/smsParser';
+import { parsePaymentAlert } from '../utils/smsParser';
 import { upiNative } from '../utils/upiNative';
 
 function ActionRow({ icon, title, description, busy = false, disabled, onPress, last }) {
@@ -47,8 +47,8 @@ export default function SettingsScreen() {
   }
 
   async function addReceipt() {
-    if (!parseUpiAlert(receipt)) {
-      setNotice('No completed UPI payment found. Paste the full alert.');
+    if (!parsePaymentAlert(receipt)) {
+      setNotice('No completed payment found. Paste the full alert.');
       return;
     }
     try {
@@ -72,7 +72,7 @@ export default function SettingsScreen() {
       <Stack.Screen options={{ title: 'Settings' }} />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
-        <Text accessibilityRole="header" style={styles.section}>UPI capture</Text>
+        <Text accessibilityRole="header" style={styles.section}>Payment alerts</Text>
         <View style={styles.group}>
           <View style={[styles.row, upiNative && capture.enabled && styles.divider]}>
             <Ionicons name="flash-outline" size={22} color={Colors.secondary} />
@@ -82,7 +82,7 @@ export default function SettingsScreen() {
                 {upiNative ? 'Add bank SMS and GPay alerts to your review queue.' : 'Requires the Android app.'}
               </Text>
             </View>
-            <Switch accessibilityLabel="Automatic UPI capture" value={capture.enabled}
+            <Switch accessibilityLabel="Automatic payment capture" value={capture.enabled}
               disabled={disabled || !upiNative}
               onValueChange={value => run('permissions', () => capture.setAutoCapture(value))}
               trackColor={{ true: Colors.primary }} />
@@ -97,7 +97,7 @@ export default function SettingsScreen() {
         <Text accessibilityRole="header" style={[styles.section, styles.nextSection]}>Add an alert</Text>
         <View style={styles.group}>
           {!!upiNative && (
-            <ActionRow icon="scan-outline" title={work === 'scan' ? 'Scanning…' : 'Scan recent UPI SMS'}
+            <ActionRow icon="scan-outline" title={work === 'scan' ? 'Scanning…' : 'Scan recent bank SMS'}
               description="Check the last 7 days." busy={work === 'scan'} disabled={disabled}
               onPress={() => run('scan', capture.scan)} />
           )}

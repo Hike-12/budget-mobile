@@ -4,6 +4,12 @@ const rejected = /\b(?:otp|one.time password|verification code|declined|failed|u
 const reference = /\b(?:upi\s*[-/]?\s*(?:ref(?:erence)?|rrn|transaction id|txn id)|rrn|ref(?:erence)?(?:\s*(?:no|number|id))?)\.?\s*[:#.-]?\s*(\d{12})\b/i;
 const amountPattern = /(?:₹|\b(?:INR|Rs\.?))\s*([\d,]+(?:\.\d{1,2})?)/gi;
 const movement = /\b(debited|paid|sent|credited|received|transferred)\b/gi;
+const upiMarker = /\b(?:UPI|VPA|RRN|GPay|Google Pay)\b/i;
+const bankAccount = /\b(?:a\/c|acct|account)\b/i;
+const directionBeforeAmount = /\b(credited|debited|cr|dr)\b\s*(?:(?:by|with|for)\s+|[:=-]\s*)?$/i;
+const directionAfterAmount = /^\s*(?:(?:is|was|has been)\s+)?\b(credited|debited|cr|dr)\b/i;
+const balanceBeforeAmount = /\b(?:balance|(?:(?:avl|avail(?:able)?)\.?\s*)?bal)\s*[:.]?\s*$/i;
+const incompleteBankMovement = /\b(?:(?:will|would|may|to)\s+be|not(?:\s+been)?|scheduled to be)\s+(?:credited|debited)\b/i;
 
 export function merchantKey(merchant) {
   return merchant.trim().toLowerCase().replace(/\s+/g, ' ');
@@ -30,29 +36,34 @@ function messageDate(text, fallback) {
   return date.getUTCDate() === Number(day) && date.getUTCMonth() === Number(month) - 1 ? date : fallback;
 }
 
-export function parseUpiAlert(raw, receivedAt = Date.now(), categories = {}) {
+export function parsePaymentAlert(raw, receivedAt = Date.now(), categories = {}) {
   if (typeof raw !== 'string') return null;
   const text = raw.replace(/\s+/g, ' ').trim();
-  if (rejected.test(text) || !/\b(?:UPI|VPA|RRN|GPay|Google Pay)\b/i.test(text)) return null;
+  const isUpi = upiMarker.test(text);
+  if (rejected.test(text) || incompleteBankMovement.test(text)) return null;
+  if (!isUpi && !bankAccount.test(text)) return null;
 
-  const amounts = [...text.matchAll(amountPattern)];
-  const verbs = [...text.matchAll(movement)];
-  if (!amounts.length || !verbs.length) return null;
-  const amountMatch = amounts[0];
+  const [amountMatch] = text.matchAll(amountPattern);
+  if (!amountMatch) return null;
   const before = text.slice(0, amountMatch.index);
-  if (/\b(?:balance|avail(?:able)?\.?\s*bal)\s*[:.]?\s*$/i.test(before)) return null;
+  if (balanceBeforeAmount.test(before)) return null;
   const amount = Number(amountMatch[1].replaceAll(',', ''));
   if (!Number.isFinite(amount) || amount <= 0) return null;
-  const direction = verbs[0][0].toLowerCase();
-  const type = /^(credited|received)$/.test(direction) ? 'income' : 'expense';
   const afterAmount = text.slice(amountMatch.index + amountMatch[0].length);
+  const bankVerb = before.match(directionBeforeAmount)?.[1] || afterAmount.match(directionAfterAmount)?.[1];
+  const direction = (isUpi ? [...text.matchAll(movement)][0]?.[1] : null) || bankVerb;
+  if (!direction) return null;
+  const type = /^(credited|received|cr)$/i.test(direction) ? 'income' : 'expense';
+  const fallbackTitle = isUpi ? 'UPI transaction' : type === 'expense' ? 'Bank debit'
+    : /\bsalary\b/i.test(text) ? 'Salary' : 'Bank credit';
   const party = type === 'income' ? /\bfrom\s+(.+)/i : /\b(?:to|at|towards)\s+(.+)/i;
   const tail = afterAmount.replace(/^\s*(?:debited|credited)\s+(?:to|from)\s+(?:your\s+)?(?:bank\s+)?(?:a\/c|acct|account)\s*[\w*.-]*/i, '');
-  const merchant = (tail.match(party)?.[1] || tail.match(/\b(?:VPA|Info)\s*[:/-]?\s*(.+)/i)?.[1] || before.match(party)?.[1] || '')
+  const details = isUpi ? tail : tail.split(/\b(?:avl|avail(?:able)?\.?\s+bal(?:ance)?|bal(?:ance)?|not\s+u)\b/i)[0];
+  const merchant = (details.match(party)?.[1] || details.match(/\b(?:VPA|Info)\s*[:/-]?\s*(.+)/i)?.[1] || before.match(party)?.[1] || '')
     .split(/\s+(?:on|via|using|with|UPI|Ref(?:erence)?|RRN|Txn|Avl|Balance|VPA)\b|[;,]|\.(?=\s|$)/i)[0]
     .trim()
-    .slice(0, 80) || 'UPI transaction';
-  const upiRefId = text.match(reference)?.[1] || null;
+    .slice(0, 80) || fallbackTitle;
+  const upiRefId = isUpi ? text.match(reference)?.[1] || null : null;
   const time = new Date(receivedAt);
   const fallback = Number.isFinite(time.getTime()) ? time : new Date();
   const timestamp = messageDate(text, fallback);
@@ -64,7 +75,9 @@ export function parseUpiAlert(raw, receivedAt = Date.now(), categories = {}) {
     category: REVIEW_CATEGORIES.includes(remembered) ? remembered : guessCategory(merchant),
     upiRefId,
     createdAt: timestamp.toISOString(),
-    rawSmsSnippet: text.replace(/[\w.+-]+@[\w.-]+/g, '[UPI address]').replace(/\d+/g, '•').slice(0, 180),
+    ...(isUpi && {
+      rawSmsSnippet: text.replace(/[\w.+-]+@[\w.-]+/g, '[UPI address]').replace(/\d+/g, '•').slice(0, 180),
+    }),
   };
 }
 

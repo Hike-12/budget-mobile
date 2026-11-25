@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { captureKey, parseUpiAlert } from '../utils/smsParser.js';
+import { captureKey, parsePaymentAlert } from '../utils/smsParser.js';
 
 const time = Date.parse('2026-11-24T08:54:00Z');
 const fixtures = [
@@ -16,7 +16,7 @@ const fixtures = [
 ];
 for (const [index, [bank, message, amount, type, title]] of fixtures.entries()) {
   test(bank, () => {
-    const item = parseUpiAlert(message, time);
+    const item = parsePaymentAlert(message, time);
     assert.deepEqual([item.amount, item.type, item.title], [amount, type, title]);
     assert.equal(item.upiRefId, String(628412345601 + index));
     assert.ok(item.createdAt.startsWith('2026-11-24'));
@@ -30,18 +30,38 @@ for (const message of [
   'GPay payment requested for ₹100',
   'Win prizes when you paid ₹499 on UPI',
   'UPI payment declined. INR 15 debited',
-  'Account debited INR 250 at ATM',
-]) test(message, () => assert.equal(parseUpiAlert(message, time), null));
+  'A/c XX1234 will be credited with INR 2500 on 27-Nov-26',
+  'A/c XX1234 not debited INR 250. Bal INR 11000.',
+  'A/c XX1234 Bal Rs 250.00 after the last debit.',
+  'Account XX1234: Pay your EMI of INR 500 on 27-Nov-26.',
+]) test(message, () => assert.equal(parsePaymentAlert(message, time), null));
+
+for (const [name, message, type, amount, title] of [
+  ['Union Bank Dr', 'Union Bank of India A/c*4321 Dr Rs12.00 on 25-11-26 10:46 by MB 111111222222 Fv.CMP P, Bal Rs912.34 Not U?Call your bank.', 'expense', 12, 'Bank debit'],
+  ['Union Bank Cr salary', 'Union Bank of India A/c*4321 Cr Rs52,000.00 on 25-11-26 10:46 by NEFT SALARY, Bal Rs72,345.67', 'income', 52000, 'Salary'],
+  ['NEFT credit', 'INR 2,000.50 credited to A/c XX1234 from Example Co via NEFT. Available balance: INR 3200.', 'income', 2000.5, 'Example Co'],
+  ['ATM debit', 'Account debited INR 250 at ATM', 'expense', 250, 'ATM'],
+  ['UPI debit abbreviated by the bank', 'A/c XX1234 Dr Rs75.00 to Metro via UPI. RRN: 111111222222', 'expense', 75, 'Metro'],
+]) {
+  test(name, () => {
+    const item = parsePaymentAlert(message, time);
+    assert.deepEqual([item?.type, item?.amount, item?.title], [type, amount, title]);
+    if (!message.includes('UPI')) {
+      assert.equal(item.upiRefId, null);
+      assert.equal(item.rawSmsSnippet, undefined);
+    }
+  });
+}
 
 test('remembered category and receipt timestamp', () => {
-  const item = parseUpiAlert('Google Pay: You paid ₹300 to Zomato.', time, { zomato: 'Bills' });
+  const item = parsePaymentAlert('Google Pay: You paid ₹300 to Zomato.', time, { zomato: 'Bills' });
   assert.equal(item.category, 'Bills');
   assert.equal(item.createdAt, new Date(time).toISOString());
 });
 
 test('an inbox rescan keeps the same identity without collapsing separate receipts', () => {
   const alert = { body: 'Google Pay: You paid ₹40 to Cafe.', timestamp: time };
-  const item = parseUpiAlert(alert.body, alert.timestamp);
+  const item = parsePaymentAlert(alert.body, alert.timestamp);
   assert.equal(captureKey(item, alert), captureKey(item, { ...alert }));
   assert.notEqual(captureKey(item, alert), captureKey(item, { ...alert, timestamp: time + 60_000 }));
 });
@@ -49,6 +69,6 @@ test('an inbox rescan keeps the same identity without collapsing separate receip
 test('a reference identifies the same payment in an SMS and a GPay notification', () => {
   const sms = { body: fixtures[0][1], timestamp: time };
   const notification = { body: 'Google Pay: You paid ₹1,245.50 to Zomato. Ref: 628412345601' };
-  assert.equal(captureKey(parseUpiAlert(sms.body, time), sms),
-    captureKey(parseUpiAlert(notification.body, time), notification));
+  assert.equal(captureKey(parsePaymentAlert(sms.body, time), sms),
+    captureKey(parsePaymentAlert(notification.body, time), notification));
 });
