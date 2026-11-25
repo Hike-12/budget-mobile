@@ -1,10 +1,12 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
 import TransactionCategoryPicker from './TransactionCategoryPicker';
+import TransactionCalendar, { calendarDateKey } from './TransactionCalendar';
+import { transactionFormStyles as formStyles, transactionPlaceholderColor, TransactionTypeField } from './TransactionFormFields';
 import { transactionRulesRequest } from '../utils/transactionRules';
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -13,14 +15,16 @@ const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR
 const dateLabel = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' });
 const makeRequestId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-function Button({ label, onPress, primary, disabled, icon, selected, roomy }) {
+function Button({ label, onPress, primary, disabled, icon, roomy }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!disabled, selected }}
+    <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!disabled }}
       disabled={disabled} onPress={onPress}
-      style={({ pressed }) => [styles.button, roomy && styles.roomyButton, primary && styles.primary, selected && styles.selected,
+      style={({ pressed }) => [styles.button, roomy && styles.roomyButton, primary && styles.primary,
         pressed && styles.pressed, disabled && styles.disabled]}>
-      {icon && <Ionicons name={icon} size={17} color={primary ? Colors.dark : Colors.secondary} />}
-      <Text style={[styles.buttonText, primary && styles.primaryText]}>{label}</Text>
+      <View style={styles.buttonContent}>
+        {icon && <Ionicons name={icon} size={17} color={primary ? Colors.dark : Colors.secondary} />}
+        <Text style={[styles.buttonText, primary && styles.primaryText]}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -28,14 +32,14 @@ function Button({ label, onPress, primary, disabled, icon, selected, roomy }) {
 function Field({ label, ...props }) {
   return (
     <View style={styles.field}>
-      <Text style={styles.label}>{label}</Text>
-      <TextInput {...props} accessibilityLabel={label} placeholderTextColor={Colors.secondary}
-        style={[styles.input, props.multiline && styles.multiline]} />
+      <Text style={formStyles.label}>{label}</Text>
+      <TextInput {...props} accessibilityLabel={label} placeholderTextColor={transactionPlaceholderColor}
+        style={[formStyles.input, props.multiline && formStyles.textArea]} />
     </View>
   );
 }
 
-function RuleEditor({ initial, kind, today, busy, onSave, onCancel }) {
+function RuleEditor({ initial, kind, today, busy, error, onSave, onCancel }) {
   const recurring = kind === 'recurring';
   const [form, setForm] = useState(() => initial ? { ...initial, amount: String(initial.amount) } : {
     title: '', amount: '', type: 'expense', category: 'miscellaneous', note: '',
@@ -49,23 +53,17 @@ function RuleEditor({ initial, kind, today, busy, onSave, onCancel }) {
   const canSave = !!form.title.trim() && amount > 0 && amount <= 1e9 && validDate && (!recurring || !!form.weekdays.length);
 
   return (
-    <View style={styles.card}>
-      <Field label="Name" placeholder="Rickshaw" value={form.title} onChangeText={(value) => change('title', value)} maxLength={80} />
-      <Field label="Amount (₹)" keyboardType="decimal-pad" value={form.amount} onChangeText={(value) => change('amount', value)} />
-      <View style={styles.field}>
-        <Text style={styles.label}>Type</Text>
-        <View style={styles.actions}>
-          <Button label="Expense" selected={form.type === 'expense'} onPress={() => change('type', 'expense')} />
-          <Button label="Income" selected={form.type === 'income'} onPress={() => change('type', 'income')} />
-        </View>
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>Category</Text>
-        <TransactionCategoryPicker value={form.category} onChange={(value) => change('category', value)} />
-      </View>
+    <>
+      <Field label="Title" placeholder="Enter title" value={form.title} onChangeText={(value) => change('title', value)} maxLength={80} />
+      <Field label="Amount" placeholder="Enter amount" keyboardType="decimal-pad" value={form.amount} onChangeText={(value) => change('amount', value)} />
+      {recurring && <TransactionCalendar label="Start date" value={new Date(`${form.startDate}T00:00:00`)}
+        min={initial?.startDate < today ? initial.startDate : today} onChange={(date) => change('startDate', calendarDateKey(date))} />}
+      <TransactionTypeField value={form.type} onChange={(value) => change('type', value)} />
+      <Text style={formStyles.label}>Category</Text>
+      <TransactionCategoryPicker value={form.category} onChange={(value) => change('category', value)} style={formStyles.category} />
       {recurring && <>
-        <View style={styles.field}>
-          <Text style={styles.label}>Repeat on</Text>
+        <View style={formStyles.category}>
+          <Text style={formStyles.label}>Repeat on</Text>
           <View style={styles.actions}>
             {order.map((day) => {
               const selected = form.weekdays.includes(day);
@@ -79,15 +77,20 @@ function RuleEditor({ initial, kind, today, busy, onSave, onCancel }) {
             })}
           </View>
         </View>
-        <Field label="Start date (YYYY-MM-DD)" value={form.startDate} onChangeText={(value) => change('startDate', value)} maxLength={10} autoCorrect={false} />
       </>}
-      <Field label="Note (optional)" value={form.note} onChangeText={(value) => change('note', value)} maxLength={500} multiline />
-      <View style={styles.actions}>
-        <Button label={busy ? 'Saving…' : 'Save'} primary disabled={busy || !canSave}
-          onPress={() => onSave({ ...form, kind, amount })} />
-        <Button label="Cancel" disabled={busy} onPress={onCancel} />
-      </View>
-    </View>
+      <Field label="Note (Optional)" placeholder="Add a note" value={form.note} onChangeText={(value) => change('note', value)} maxLength={500} multiline />
+      {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
+      <TouchableOpacity accessibilityRole="button" disabled={busy || !canSave}
+        style={[formStyles.submit, (busy || !canSave) && formStyles.submitDisabled]}
+        onPress={() => onSave({ ...form, kind, amount })}>
+        {busy ? <ActivityIndicator color={Colors.dark} /> : <Text style={formStyles.submitText}>
+          {initial ? 'Save Changes' : recurring ? 'Save Schedule' : 'Save Quick Transaction'}
+        </Text>}
+      </TouchableOpacity>
+      <TouchableOpacity accessibilityRole="button" style={formStyles.cancel} disabled={busy} onPress={onCancel}>
+        <Text style={formStyles.cancelText}>Cancel</Text>
+      </TouchableOpacity>
+    </>
   );
 }
 
@@ -105,6 +108,17 @@ export default function TransactionRulesScreen({ kind }) {
   const [reload, setReload] = useState(0);
   const inFlight = useRef(false);
   const requestIds = useRef({});
+  const closeEditor = useCallback(() => {
+    if (inFlight.current) return;
+    setEditor(null);
+    setError(null);
+  }, []);
+  const editing = Boolean(editor);
+  useFocusEffect(useCallback(() => {
+    if (!editing) return;
+    const back = BackHandler.addEventListener('hardwareBackPress', () => { closeEditor(); return true; });
+    return () => back.remove();
+  }, [closeEditor, editing]));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -146,12 +160,16 @@ export default function TransactionRulesScreen({ kind }) {
   const unauthorized = error?.response?.status === 401;
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
-      <Stack.Screen options={{ title: editor ? (editor._id ? 'Edit transaction setup' : newLabel) : title }} />
-      <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={[styles.content, !recurring && styles.quickContent]} keyboardShouldPersistTaps="handled">
+      <Stack.Screen options={{ title: editor ? (editor._id ? (recurring ? 'Edit Schedule' : 'Edit Quick Transaction') : newLabel) : title,
+        ...(editing && { headerLeft: () => <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={10} onPress={closeEditor}>
+          <Ionicons name="chevron-back" color={Colors.accent} size={24} />
+        </Pressable> }),
+      }} />
+      <KeyboardAvoidingView style={styles.screen} behavior="padding">
+        <ScrollView contentContainerStyle={editing ? styles.editorContent : [styles.content, !recurring && styles.quickContent]} keyboardShouldPersistTaps="handled">
           {!editor && <Text style={styles.hint}>{recurring ? 'Log entries automatically on the days you choose. Dates use India time.' : 'Save the details once, then add the transaction in one tap.'}</Text>}
           {!!notice && <Text accessibilityLiveRegion="polite" style={styles.hint}>{notice}</Text>}
-          {!!error && <View style={styles.card}>
+          {!!error && !editing && <View style={styles.card}>
             <Text accessibilityLiveRegion="polite" style={styles.hint}>{unauthorized
               ? 'Sign in again to sync your saved transactions.' : error.response?.data?.error || 'Could not connect. Try again.'}</Text>
             {unauthorized ? <Button label="Sign in" primary onPress={() => router.replace({
@@ -161,7 +179,7 @@ export default function TransactionRulesScreen({ kind }) {
           {!data && !error && <ActivityIndicator accessibilityLabel="Loading" color={Colors.secondary} />}
           {editor && data && <RuleEditor key={editor._id || 'new'} initial={editor._id ? editor : null} kind={kind}
             today={data.today} busy={!!active} onSave={(rule) => save(rule, editor._id)}
-            onCancel={() => { setEditor(null); setError(null); }} />}
+            error={error && (error.response?.data?.error || 'Could not connect. Try again.')} onCancel={closeEditor} />}
           {!editor && data && <>
             {!data.rules.length && <Text style={styles.title}>{recurring ? 'No schedules yet' : 'No quick transactions yet'}</Text>}
             <Button label={newLabel} icon="add" primary roomy={!recurring} disabled={!!active} onPress={() => { setEditor({}); setRemove(null); setNotice(''); }} />
@@ -213,6 +231,7 @@ export default function TransactionRulesScreen({ kind }) {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.dark },
   content: { gap: 14, padding: 16, paddingBottom: 32, maxWidth: 680, alignSelf: 'center', width: '100%' },
+  editorContent: { padding: 20, paddingBottom: 30 },
   card: { backgroundColor: Colors.card, padding: 15, gap: 13, borderRadius: 16, borderWidth: 1, borderColor: Colors.borderLight },
   quickContent: { gap: 18, paddingTop: 20 },
   quickCard: { padding: 18, gap: 16 },
@@ -225,17 +244,15 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   quickActions: { alignItems: 'center', gap: 10 },
   button: { minHeight: 46, paddingHorizontal: 13, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
-  roomyButton: { minHeight: 52, paddingHorizontal: 17, paddingVertical: 11, gap: 7 },
+  roomyButton: { minHeight: 52, paddingHorizontal: 17, paddingVertical: 11 },
+  buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   primary: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   selected: { backgroundColor: '#25384b', borderColor: Colors.primary },
   buttonText: { color: Colors.accent, fontWeight: '600', fontSize: 14, flexShrink: 1, textAlign: 'center' },
   primaryText: { color: Colors.dark },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.48 },
-  field: { gap: 6 },
-  label: { color: Colors.accent, fontSize: 14, fontWeight: '600' },
-  input: { minHeight: 46, backgroundColor: Colors.dark, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9, paddingHorizontal: 12, color: Colors.accent, fontSize: 15 },
-  multiline: { paddingVertical: 10, minHeight: 70, textAlignVertical: 'top' },
+  error: { color: Colors.red, marginBottom: 8 },
   capitalize: { color: Colors.secondary, textTransform: 'capitalize' },
   day: { minHeight: 44, minWidth: 44, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9 },
 });

@@ -11,7 +11,6 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
-  useWindowDimensions,
   View,
 } from 'react-native';
 import BudgetCard from '../components/BudgetCard';
@@ -45,8 +44,6 @@ export default function DashboardScreen() {
   const refreshCapture = capture.refresh;
   const pendingCount = username ? capture.items.length : 0;
   const router = useRouter();
-  const { width, fontScale } = useWindowDimensions();
-  const stackAddActions = width < 350 || fontScale >= 1.35;
   const { privacyMode, togglePrivacy } = usePrivacy();
 
   // --- Debounce search ---
@@ -227,13 +224,13 @@ export default function DashboardScreen() {
         setFilterRange={setFilterRange}
       />
 
-      <View style={[styles.addActions, stackAddActions && styles.stackedAddActions]}>
-        <TouchableOpacity style={[styles.addButton, stackAddActions && styles.stackedAddButton]} onPress={() => router.push('/add-transaction')}
-          accessibilityRole="button" activeOpacity={0.8}>
+      <View style={styles.addActions}>
+        <TouchableOpacity style={[styles.transactionAction, styles.addButton]} onPress={() => router.push('/add-transaction')}
+          accessibilityRole="button" accessibilityLabel="Add transaction" activeOpacity={0.8}>
           <Ionicons name="add" size={19} color={Colors.dark} />
-          <Text style={styles.addButtonText}>Add Transaction</Text>
+          <Text style={styles.addButtonText}>Add</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.quickButton, stackAddActions && styles.stackedAddButton]} onPress={() => router.push('/quick-transactions')}
+        <TouchableOpacity style={[styles.transactionAction, styles.quickButton]} onPress={() => router.push('/quick-transactions')}
           accessibilityRole="button" activeOpacity={0.8}>
           <Ionicons name="flash-outline" size={17} color={Colors.secondary} />
           <Text style={styles.quickButtonText}>Quick add</Text>
@@ -261,7 +258,7 @@ export default function DashboardScreen() {
         </View>
       )}
     </>
-  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router, pendingCount, stackAddActions]);
+  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router, pendingCount]);
 
   const listFooter = useMemo(() => {
     if (filteredCount === 0) return null;
@@ -406,19 +403,19 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   addActions: { flexDirection: 'row', gap: 12, marginVertical: 14 },
-  stackedAddActions: { flexDirection: 'column', gap: 10 },
-  addButton: {
-    backgroundColor: Colors.primary,
+  transactionAction: {
     minHeight: 54,
-    paddingHorizontal: 14,
+    paddingHorizontal: 10,
     paddingVertical: 12,
     borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    flex: 1.22,
-    gap: 7,
+    flex: 1,
+    borderWidth: 1,
+    gap: 6,
   },
+  addButton: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   addButtonText: {
     color: Colors.dark,
     fontWeight: '600',
@@ -426,8 +423,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: 'center',
   },
-  quickButton: { flex: 1, minHeight: 54, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 10, borderWidth: 1, borderColor: Colors.borderLight },
-  stackedAddButton: { flex: 0 },
+  quickButton: { borderColor: Colors.borderLight },
   quickButtonText: { color: Colors.accent, fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'center' },
   sectionHeader: {
     flexDirection: 'row',

@@ -1,13 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,37 +15,9 @@ import {
 import { Toast } from '../components/Toast';
 import Colors from '../constants/colors';
 import TransactionCategoryPicker from '../components/TransactionCategoryPicker';
+import TransactionCalendar from '../components/TransactionCalendar';
+import { transactionFormStyles as formStyles, transactionPlaceholderColor, TransactionTypeField } from '../components/TransactionFormFields';
 import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
-
-const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-
-const formatDate = (date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${day}/${month}/${year}`;
-};
-
-const daysInMonth = (year, month) => new Date(year, month, 0).getDate();
-
-const buildCalendarDays = (year, month) => {
-  const firstWeekday = new Date(year, month - 1, 1).getDay();
-  const totalDays = daysInMonth(year, month);
-  const cells = [];
-
-  for (let i = 0; i < firstWeekday; i += 1) cells.push(null);
-  for (let d = 1; d <= totalDays; d += 1) cells.push(d);
-  while (cells.length % 7 !== 0) cells.push(null);
-
-  return cells;
-};
-
-const getDateParts = (date) => ({
-  year: date.getFullYear(),
-  month: date.getMonth() + 1,
-  day: date.getDate(),
-});
 
 function calcPreview(expr) {
   if (!expr || !/[+\-*/]/.test(expr)) return null;
@@ -77,8 +46,6 @@ export default function AddTransactionScreen() {
   const [category, setCategory] = useState(params.category || 'miscellaneous');
   const [note, setNote] = useState(params.note || '');
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dateDraft, setDateDraft] = useState(getDateParts(initialDate));
   const [loading, setLoading] = useState(false);
   const [calcExpr, setCalcExpr] = useState(null);
   const [calcResult, setCalcResult] = useState(null);
@@ -142,56 +109,6 @@ export default function AddTransactionScreen() {
   }, [convertedFrom, convertedTo]);
 
   const router = useRouter();
-
-  const openDatePicker = useCallback(() => {
-    setDateDraft(getDateParts(selectedDate));
-    setShowDatePicker(true);
-  }, [selectedDate]);
-
-  const closeDatePicker = useCallback(() => {
-    setShowDatePicker(false);
-  }, []);
-
-  const changeMonth = useCallback((delta) => {
-    setDateDraft(prev => {
-      const shifted = new Date(prev.year, prev.month - 1 + delta, 1);
-      let year = shifted.getFullYear();
-      let month = shifted.getMonth() + 1;
-
-      if (year < 2000) {
-        year = 2000;
-        month = 1;
-      }
-
-      if (year > 2100) {
-        year = 2100;
-        month = 12;
-      }
-
-      const maxDay = daysInMonth(year, month);
-      return { ...prev, year, month, day: Math.min(prev.day, maxDay) };
-    });
-  }, []);
-
-  const selectDay = useCallback((day) => {
-    setDateDraft(prev => ({ ...prev, day }));
-  }, []);
-
-  const calendarDays = useMemo(
-    () => buildCalendarDays(dateDraft.year, dateDraft.month),
-    [dateDraft.year, dateDraft.month]
-  );
-
-  const applyDateDraft = useCallback(() => {
-    const nextDate = new Date(dateDraft.year, dateDraft.month - 1, dateDraft.day);
-    setSelectedDate(nextDate);
-    setShowDatePicker(false);
-  }, [dateDraft]);
-
-  const setToday = useCallback(() => {
-    const today = new Date();
-    setDateDraft(getDateParts(today));
-  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (submitInFlightRef.current) return;
@@ -281,28 +198,28 @@ export default function AddTransactionScreen() {
   }, [title, amount, type, category, note, selectedDate, isEdit, router]);
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior="padding">
       <Stack.Screen options={{ title: isEdit ? 'Edit Transaction' : 'Add Transaction' }} />
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: 30 }}
         keyboardShouldPersistTaps="handled"
       >
-        <Text style={styles.label}>Title</Text>
+        <Text style={formStyles.label}>Title</Text>
         <TextInput
-          style={styles.input}
+          style={formStyles.input}
           placeholder="Enter title"
-          placeholderTextColor={Colors.secondary}
+          placeholderTextColor={transactionPlaceholderColor}
           value={title}
           onChangeText={setTitle}
           returnKeyType="next"
         />
 
-        <Text style={styles.label}>Amount</Text>
+        <Text style={formStyles.label}>Amount</Text>
         <TextInput
-          style={styles.input}
+          style={formStyles.input}
           placeholder="Enter amount"
-          placeholderTextColor={Colors.secondary}
+          placeholderTextColor={transactionPlaceholderColor}
           keyboardType="numeric"
           value={amount}
           onChangeText={handleAmountChange}
@@ -340,105 +257,18 @@ export default function AddTransactionScreen() {
           )}
         </View>
 
-        <Text style={styles.label}>Date</Text>
-        <TouchableOpacity
-          style={[styles.input, styles.dateInputButton]}
-          onPress={openDatePicker}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.dateInputText}>{formatDate(selectedDate)}</Text>
-        </TouchableOpacity>
+        <TransactionCalendar value={selectedDate} onChange={setSelectedDate} />
 
-        <Modal
-          visible={showDatePicker}
-          transparent
-          animationType="fade"
-          onRequestClose={closeDatePicker}
-        >
-          <Pressable style={styles.modalOverlay} onPress={closeDatePicker}>
-            <Pressable style={styles.modalCard} onPress={() => { }}>
-              <Text style={styles.modalTitle}>Select Date</Text>
+        <TransactionTypeField value={type} onChange={setType} />
 
-              <View style={styles.calendarHeaderRow}>
-                <TouchableOpacity style={styles.navBtn} onPress={() => changeMonth(-1)} activeOpacity={0.8}>
-                  <Text style={styles.navBtnText}>{'<'}</Text>
-                </TouchableOpacity>
-                <Text style={styles.calendarHeaderTitle}>
-                  {monthNames[dateDraft.month - 1]} {dateDraft.year}
-                </Text>
-                <TouchableOpacity style={styles.navBtn} onPress={() => changeMonth(1)} activeOpacity={0.8}>
-                  <Text style={styles.navBtnText}>{'>'}</Text>
-                </TouchableOpacity>
-              </View>
+        <Text style={formStyles.label}>Category</Text>
+        <TransactionCategoryPicker value={category} onChange={setCategory} style={formStyles.category} />
 
-              <View style={styles.weekHeaderRow}>
-                {weekDays.map(dayName => (
-                  <Text key={dayName} style={styles.weekHeaderText}>{dayName}</Text>
-                ))}
-              </View>
-
-              <View style={styles.calendarGrid}>
-                {calendarDays.map((day, index) => {
-                  if (!day) {
-                    return <View key={`empty-${index}`} style={styles.dayCellEmpty} />;
-                  }
-
-                  const isSelected = day === dateDraft.day;
-
-                  return (
-                    <TouchableOpacity
-                      key={`day-${day}-${index}`}
-                      style={[styles.dayCell, isSelected && styles.dayCellSelected]}
-                      onPress={() => selectDay(day)}
-                      activeOpacity={0.8}
-                    >
-                      <Text style={[styles.dayCellText, isSelected && styles.dayCellTextSelected]}>{day}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              <View style={styles.modalActionsRow}>
-                <TouchableOpacity style={styles.modalSecondaryBtn} onPress={setToday} activeOpacity={0.8}>
-                  <Text style={styles.modalSecondaryBtnText}>Today</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalSecondaryBtn} onPress={closeDatePicker} activeOpacity={0.8}>
-                  <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.modalPrimaryBtn} onPress={applyDateDraft} activeOpacity={0.8}>
-                  <Text style={styles.modalPrimaryBtnText}>Apply</Text>
-                </TouchableOpacity>
-              </View>
-            </Pressable>
-          </Pressable>
-        </Modal>
-
-        <Text style={styles.label}>Type</Text>
-        <View style={styles.typeContainer}>
-          <TouchableOpacity
-            style={[styles.typeButton, type === 'expense' && styles.typeButtonActiveExpense]}
-            onPress={() => setType('expense')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.typeText, type === 'expense' && styles.typeTextActive]}>Expense</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.typeButton, type === 'income' && styles.typeButtonActiveIncome]}
-            onPress={() => setType('income')}
-            activeOpacity={0.7}
-          >
-            <Text style={[styles.typeText, type === 'income' && styles.typeTextActive]}>Income</Text>
-          </TouchableOpacity>
-        </View>
-
-        <Text style={styles.label}>Category</Text>
-        <TransactionCategoryPicker value={category} onChange={setCategory} style={styles.categoryContainer} />
-
-        <Text style={styles.label}>Note (Optional)</Text>
+        <Text style={formStyles.label}>Note (Optional)</Text>
         <TextInput
-          style={[styles.input, styles.textArea]}
+          style={[formStyles.input, formStyles.textArea]}
           placeholder="Add a note"
-          placeholderTextColor={Colors.secondary}
+          placeholderTextColor={transactionPlaceholderColor}
           multiline
           numberOfLines={3}
           value={note}
@@ -446,14 +276,14 @@ export default function AddTransactionScreen() {
         />
 
         <TouchableOpacity
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
+          style={[formStyles.submit, loading && formStyles.submitDisabled]}
           onPress={handleSubmit}
           activeOpacity={0.8}
           disabled={loading}
         >
           {loading
             ? <ActivityIndicator color={Colors.dark} size="small" />
-            : <Text style={styles.submitButtonText} numberOfLines={1} adjustsFontSizeToFit>
+            : <Text style={formStyles.submitText} numberOfLines={1} adjustsFontSizeToFit>
               {isEdit ? 'Save Changes' : 'Add Transaction'}
             </Text>
           }
@@ -468,144 +298,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: Colors.dark,
-  },
-  label: {
-    color: Colors.secondary,
-    fontSize: 12,
-    marginBottom: 5,
-    marginLeft: 5,
-    fontWeight: '500',
-  },
-  input: {
-    backgroundColor: Colors.primary + '20',
-    borderColor: Colors.secondary,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    color: Colors.accent,
-    marginBottom: 15,
-    fontSize: 16,
-  },
-  dateInputButton: {
-    justifyContent: 'center',
-  },
-  dateInputText: {
-    color: Colors.accent,
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  modalCard: {
-    backgroundColor: Colors.dark,
-    borderColor: Colors.secondary,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-  },
-  modalTitle: {
-    color: Colors.accent,
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  calendarHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  navBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    borderColor: Colors.secondary,
-    borderWidth: 1,
-    backgroundColor: Colors.primary + '20',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  navBtnText: {
-    color: Colors.accent,
-    fontSize: 18,
-    fontWeight: '700',
-    lineHeight: 20,
-  },
-  calendarHeaderTitle: {
-    color: Colors.accent,
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  weekHeaderRow: {
-    flexDirection: 'row',
-    marginBottom: 6,
-  },
-  weekHeaderText: {
-    flex: 1,
-    textAlign: 'center',
-    color: Colors.secondary,
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  calendarGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 14,
-  },
-  dayCellEmpty: {
-    width: '14.2857%',
-    height: 38,
-  },
-  dayCell: {
-    width: '14.2857%',
-    height: 38,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dayCellSelected: {
-    backgroundColor: Colors.primary,
-    borderRadius: 19,
-  },
-  dayCellText: {
-    color: Colors.accent,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  dayCellTextSelected: {
-    color: Colors.dark,
-    fontWeight: '700',
-  },
-  modalActionsRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 8,
-  },
-  modalSecondaryBtn: {
-    borderColor: Colors.secondary,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    backgroundColor: Colors.primary + '20',
-  },
-  modalSecondaryBtnText: {
-    color: Colors.accent,
-    fontWeight: '500',
-  },
-  modalPrimaryBtn: {
-    borderColor: Colors.primary,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    backgroundColor: Colors.primary,
-  },
-  modalPrimaryBtnText: {
-    color: Colors.dark,
-    fontWeight: '600',
   },
   operatorRow: {
     flexDirection: 'row',
@@ -638,62 +330,5 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontSize: 13,
     fontWeight: '600',
-  },
-  textArea: {
-    height: 80,
-    textAlignVertical: 'top',
-  },
-  typeContainer: {
-    flexDirection: 'row',
-    gap: 10,
-    marginBottom: 15,
-  },
-  typeButton: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 10,
-    backgroundColor: Colors.primary + '20',
-    borderColor: Colors.secondary,
-    borderWidth: 1,
-    alignItems: 'center',
-    minHeight: 48,
-    justifyContent: 'center',
-  },
-  typeButtonActiveExpense: {
-    backgroundColor: Colors.red + '30',
-    borderColor: Colors.red,
-  },
-  typeButtonActiveIncome: {
-    backgroundColor: Colors.green + '30',
-    borderColor: Colors.green,
-  },
-  typeText: {
-    color: Colors.secondary,
-    fontWeight: '500',
-  },
-  typeTextActive: {
-    color: Colors.accent,
-  },
-  categoryContainer: {
-    marginBottom: 15,
-  },
-  submitButton: {
-    backgroundColor: Colors.primary,
-    padding: 15,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginTop: 10,
-    minHeight: 50,
-    justifyContent: 'center',
-  },
-  submitButtonDisabled: {
-    opacity: 0.7,
-  },
-  submitButtonText: {
-    color: Colors.dark,
-    fontWeight: '600',
-    fontSize: 15,
-    textAlign: 'center',
-    paddingHorizontal: 10,
   },
 });
