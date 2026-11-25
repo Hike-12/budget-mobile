@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
+import { MAIN_TRANSACTION_CATEGORIES as categories } from '../constants/transactionCategories';
 import { transactionRulesRequest } from '../utils/transactionRules';
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const order = [1, 2, 3, 4, 5, 6, 0];
-const categories = ['miscellaneous', 'personal', 'Transport', 'Food', 'Travel', 'Shopping', 'Bills', 'Entertainment', 'Health', 'school friends', 'college friends', 'religion', 'Other'];
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 0 });
 const dateLabel = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' });
 const makeRequestId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;

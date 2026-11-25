@@ -17,9 +17,9 @@ import {
 } from 'react-native';
 import { Toast } from '../components/Toast';
 import Colors from '../constants/colors';
+import { MAIN_TRANSACTION_CATEGORIES as categories } from '../constants/transactionCategories';
 import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
 
-const categories = ['school friends', 'college friends', 'religion', 'personal', 'miscellaneous'];
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
