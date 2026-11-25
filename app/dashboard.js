@@ -228,11 +228,13 @@ export default function DashboardScreen() {
       <View style={styles.addActions}>
         <TouchableOpacity style={[styles.transactionAction, styles.addButton]} onPress={() => router.push('/add-transaction')}
           accessibilityRole="button" accessibilityLabel="Add transaction" activeOpacity={0.8}>
-          <ActionLabel style={styles.addButtonText}><Ionicons name="add" size={19} color={Colors.dark} />{'  '}Add Transaction</ActionLabel>
+          <Ionicons name="add" size={19} color={Colors.dark} accessible={false} />
+          <ActionLabel style={styles.addButtonText}>Add Transaction</ActionLabel>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.transactionAction, styles.quickButton]} onPress={() => router.push('/quick-transactions')}
           accessibilityRole="button" accessibilityLabel="Quick add" activeOpacity={0.8}>
-          <ActionLabel style={styles.quickButtonText}><Ionicons name="flash-outline" size={17} color={Colors.secondary} />{'  '}Quick add</ActionLabel>
+          <Ionicons name="flash-outline" size={19} color={Colors.secondary} accessible={false} />
+          <ActionLabel style={styles.quickButtonText}>Quick add</ActionLabel>
         </TouchableOpacity>
       </View>
 
@@ -405,9 +407,11 @@ const styles = StyleSheet.create({
   transactionAction: {
     minHeight: 54,
     paddingHorizontal: 10,
-    paddingVertical: 12,
+    paddingVertical: 8,
     borderRadius: 10,
     justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
     flex: 1,
     minWidth: 0,
     borderWidth: 1,
