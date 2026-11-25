@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Toast } from '../components/Toast';
 import Colors from '../constants/colors';
-import { MAIN_TRANSACTION_CATEGORIES as categories } from '../constants/transactionCategories';
+import TransactionCategoryPicker from '../components/TransactionCategoryPicker';
 import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
 
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -432,20 +432,7 @@ export default function AddTransactionScreen() {
         </View>
 
         <Text style={styles.label}>Category</Text>
-        <View style={styles.categoryContainer}>
-          {categories.map(cat => (
-            <TouchableOpacity
-              key={cat}
-              style={[styles.categoryButton, category === cat && styles.categoryButtonActive]}
-              onPress={() => setCategory(cat)}
-              activeOpacity={0.7}
-            >
-              <Text style={[styles.categoryText, category === cat && styles.categoryTextActive]}>
-                {cat.charAt(0).toUpperCase() + cat.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <TransactionCategoryPicker value={category} onChange={setCategory} style={styles.categoryContainer} />
 
         <Text style={styles.label}>Note (Optional)</Text>
         <TextInput
@@ -688,31 +675,7 @@ const styles = StyleSheet.create({
     color: Colors.accent,
   },
   categoryContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
     marginBottom: 15,
-  },
-  categoryButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    backgroundColor: Colors.primary + '20',
-    borderColor: Colors.secondary,
-    borderWidth: 1,
-    minHeight: 36,
-    justifyContent: 'center',
-  },
-  categoryButtonActive: {
-    backgroundColor: Colors.secondary,
-  },
-  categoryText: {
-    color: Colors.secondary,
-    fontSize: 12,
-  },
-  categoryTextActive: {
-    color: Colors.dark,
-    fontWeight: '500',
   },
   submitButton: {
     backgroundColor: Colors.primary,

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
-import { MAIN_TRANSACTION_CATEGORIES as categories } from '../constants/transactionCategories';
+import TransactionCategoryPicker from './TransactionCategoryPicker';
 import { transactionRulesRequest } from '../utils/transactionRules';
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -41,7 +41,6 @@ function RuleEditor({ initial, kind, today, busy, onSave, onCancel }) {
     title: '', amount: '', type: 'expense', category: 'miscellaneous', note: '',
     ...(recurring && { weekdays: [], startDate: today, paused: false }),
   });
-  const [showCategories, setShowCategories] = useState(false);
   const change = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const amount = Number(form.amount.replace(',', '.'));
   const validDate = !recurring || (/^\d{4}-\d{2}-\d{2}$/.test(form.startDate)
@@ -62,15 +61,7 @@ function RuleEditor({ initial, kind, today, busy, onSave, onCancel }) {
       </View>
       <View style={styles.field}>
         <Text style={styles.label}>Category</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={`Category, ${form.category}`}
-          accessibilityState={{ expanded: showCategories }} onPress={() => setShowCategories(!showCategories)} style={styles.category}>
-          <Text style={styles.capitalize}>{form.category}</Text>
-          <Ionicons name={showCategories ? 'chevron-up' : 'chevron-down'} size={17} color={Colors.secondary} />
-        </Pressable>
-        {showCategories && <View style={styles.actions}>
-          {categories.map((category) => <Button key={category} label={category} selected={form.category === category}
-            onPress={() => { change('category', category); setShowCategories(false); }} />)}
-        </View>}
+        <TransactionCategoryPicker value={form.category} onChange={(value) => change('category', value)} />
       </View>
       {recurring && <>
         <View style={styles.field}>
@@ -245,7 +236,6 @@ const styles = StyleSheet.create({
   label: { color: Colors.accent, fontSize: 14, fontWeight: '600' },
   input: { minHeight: 46, backgroundColor: Colors.dark, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9, paddingHorizontal: 12, color: Colors.accent, fontSize: 15 },
   multiline: { paddingVertical: 10, minHeight: 70, textAlignVertical: 'top' },
-  category: { minHeight: 46, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: Colors.dark, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9, paddingHorizontal: 12 },
   capitalize: { color: Colors.secondary, textTransform: 'capitalize' },
   day: { minHeight: 44, minWidth: 44, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9 },
 });
