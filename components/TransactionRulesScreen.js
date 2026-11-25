@@ -161,9 +161,9 @@ export default function TransactionRulesScreen({ kind }) {
   return (
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
       <Stack.Screen options={{ title: editor ? (editor._id ? (recurring ? 'Edit Schedule' : 'Edit Quick Transaction') : newLabel) : title,
-        ...(editing && { headerLeft: () => <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={10} onPress={closeEditor}>
+        headerLeft: editing ? () => <Pressable accessibilityRole="button" accessibilityLabel="Back" hitSlop={10} onPress={closeEditor}>
           <Ionicons name="chevron-back" color={Colors.accent} size={24} />
-        </Pressable> }),
+        </Pressable> : undefined,
       }} />
       <KeyboardAvoidingView style={styles.screen} behavior="padding">
         <ScrollView contentContainerStyle={editing ? styles.editorContent : [styles.content, !recurring && styles.quickContent]} keyboardShouldPersistTaps="handled">

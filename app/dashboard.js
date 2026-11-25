@@ -88,6 +88,7 @@ export default function DashboardScreen() {
 
 
   const handleDelete = useCallback(async (id) => {
+    await addToUnsyncedQueue({ action: 'delete', id });
     setBudgets(prev => prev.filter(b => b._id !== id));
     // Persist outside the state updater to avoid async-in-updater anti-pattern
     const raw = await AsyncStorage.getItem('budgets');
@@ -95,7 +96,6 @@ export default function DashboardScreen() {
     await AsyncStorage.setItem('budgets', JSON.stringify(all.filter(b => b._id !== id)));
 
     Toast.show({ message: 'Transaction deleted.', type: 'success' });
-    await addToUnsyncedQueue({ action: 'delete', id });
 
     const netState = await NetInfo.fetch();
     if (netState.isConnected) doSync();

@@ -8,7 +8,13 @@ import { accountHeaders } from './transactionRules';
  * Adds a change to the unsynced queue, deduplicating by action+id.
  * @param {{ action: 'add'|'edit'|'delete', budget?: object, id?: string }} change
  */
-export async function addToUnsyncedQueue(change) {
+export function addToUnsyncedQueue(change) {
+    // A later sync must wait for this write, even if an earlier sync is running.
+    pendingSync = null;
+    return serializeSync(() => enqueueChange(change));
+}
+
+async function enqueueChange(change) {
     const raw = await AsyncStorage.getItem('unsynced');
     const unsynced = raw ? JSON.parse(raw) : [];
 
@@ -40,12 +46,14 @@ function dedupeQueue(queue) {
     return Array.from(map.values()).reverse();
 }
 
-/**
- * Module-level sync lock.  Prevents concurrent invocations of syncWithServer
- * from any caller (NetInfo listener, add-transaction, pull-to-refresh, etc.).
- * If a second call arrives while one is running, it awaits the in-flight one.
- */
-let _syncPromise = null;
+let syncWork = Promise.resolve();
+let pendingSync = null;
+
+function serializeSync(work) {
+    const result = syncWork.then(work);
+    syncWork = result.catch(() => {});
+    return result;
+}
 
 /**
  * Syncs the local unsynced queue with the remote server.
@@ -54,15 +62,13 @@ let _syncPromise = null;
  * @param {string} user - username
  * @returns {Promise<Array|null>} the latest server budgets, or null
  */
-export async function syncWithServer(user) {
-    // If a sync is already in progress, piggyback onto it
-    if (_syncPromise) return _syncPromise;
-    _syncPromise = _syncWithServerInner(user);
-    try {
-        return await _syncPromise;
-    } finally {
-        _syncPromise = null;
-    }
+export function syncWithServer(user) {
+    if (pendingSync && pendingSync.user === user) return pendingSync.result;
+    const result = serializeSync(() => _syncWithServerInner(user)).finally(() => {
+        if (pendingSync?.result === result) pendingSync = null;
+    });
+    pendingSync = { user, result };
+    return result;
 }
 
 async function _syncWithServerInner(user) {
@@ -77,10 +83,11 @@ async function _syncWithServerInner(user) {
 
     // Fetch current server state once — reused for dedup AND as the final truth
     let serverList;
+    const url = `${API_URL}/api/budgets`;
+    let options;
     try {
-        serverList = (await axios.get(`${API_URL}/api/budgets`, {
-            params: { user: normalizedUser }, headers: await accountHeaders(),
-        })).data || [];
+        options = { headers: await accountHeaders(), timeout: 12000 };
+        serverList = (await axios.get(url, { ...options, params: { user: normalizedUser } })).data || [];
     } catch {
         return null; // network issue — bail without losing queue
     }
@@ -110,12 +117,12 @@ async function _syncWithServerInner(user) {
         try {
             if (change.action === 'add') {
                 if (!serverByClientId.has(clientId)) {
-                    await axios.post(`${API_URL}/api/budgets`, {
+                    await axios.post(url, {
                         ...change.budget,
                         clientId,
                         user: normalizedUser,
                         updatedAt: change.budget.updatedAt || new Date().toISOString(),
-                    });
+                    }, options);
                     // Optimistically mark as synced so a subsequent edit in same cycle can find it.
                     // We don't have the server's _id yet, so edit will be skipped until next full sync.
                     serverByClientId.set(clientId, null);
@@ -126,24 +133,23 @@ async function _syncWithServerInner(user) {
                     serverDoc = serverById.get(String(clientId));
                 }
                 if (serverDoc) {
-                    await axios.patch(`${API_URL}/api/budgets`, {
+                    await axios.patch(url, {
                         ...change.budget,
                         id: serverDoc._id,
                         user: normalizedUser,
                         updatedAt: change.budget.updatedAt || new Date().toISOString(),
-                    });
+                    }, options);
                 }
             } else if (change.action === 'delete') {
                 const stableId = change.id;
-                const existsOnServer = serverByClientId.has(stableId) || serverById.has(String(stableId));
-
-                // Deleting a non-existent entity is already a successful end state.
-                if (!existsOnServer) {
-                    continue;
-                }
-
-                await axios.delete(`${API_URL}/api/budgets`, {
-                    data: { id: stableId, clientId: stableId, user: normalizedUser },
+                const serverDoc = serverById.get(stableId) || serverByClientId.get(stableId);
+                await axios.delete(url, {
+                    ...options,
+                    data: {
+                        id: serverDoc?._id ?? (/^[0-9a-f]{24}$/i.test(stableId) ? stableId : undefined),
+                        clientId: stableId,
+                        user: normalizedUser,
+                    },
                 });
 
                 serverByClientId.delete(stableId);
@@ -167,12 +173,15 @@ async function _syncWithServerInner(user) {
     // Only re-fetch if mutations were attempted so we get the true final state
     if (unsynced.length > 0) {
         try {
-            serverList = (await axios.get(`${API_URL}/api/budgets?user=${normalizedUser}`)).data || [];
+            serverList = (await axios.get(url, { ...options, params: { user: normalizedUser } })).data || [];
         } catch {
             // Keep the list from the earlier fetch
         }
     }
 
+    // Keep local deletions hidden while they retry or if the refresh is stale.
+    const deletedIds = new Set(unsynced.filter(change => change.action === 'delete').map(change => change.id));
+    serverList = serverList.filter(budget => !deletedIds.has(budget._id) && !deletedIds.has(budget.clientId));
     await AsyncStorage.setItem('budgets', JSON.stringify(serverList));
     return serverList;
 }
