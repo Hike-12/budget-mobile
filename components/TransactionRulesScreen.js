@@ -12,6 +12,7 @@ import { transactionRulesRequest } from '../utils/transactionRules';
 
 const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const order = [1, 2, 3, 4, 5, 6, 0];
+const weekdayRows = [order.slice(0, 3), order.slice(3)];
 const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2, minimumFractionDigits: 0 });
 const dateLabel = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' });
 const makeRequestId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -65,17 +66,21 @@ function RuleEditor({ initial, kind, today, busy, error, onSave, onCancel }) {
       {recurring && <>
         <View style={formStyles.category}>
           <Text style={formStyles.label}>Repeat on</Text>
-          <View style={styles.actions}>
-            {order.map((day) => {
-              const selected = form.weekdays.includes(day);
-              return (
-                <Pressable key={day} accessibilityRole="button" accessibilityLabel={days[day]} accessibilityState={{ selected }}
-                  style={[styles.day, selected && styles.selected]} onPress={() => change('weekdays',
-                    selected ? form.weekdays.filter((value) => value !== day) : [...form.weekdays, day])}>
-                  <Text style={styles.buttonText}>{days[day].slice(0, 3)}</Text>
-                </Pressable>
-              );
-            })}
+          <View style={styles.weekdays}>
+            {weekdayRows.map((row) => (
+              <View key={row[0]} style={styles.weekdayRow}>
+                {row.map((day) => {
+                  const selected = form.weekdays.includes(day);
+                  return (
+                    <Pressable key={day} accessibilityRole="button" accessibilityLabel={days[day]} accessibilityState={{ selected }}
+                      style={[styles.day, selected && styles.selected]} onPress={() => change('weekdays',
+                        selected ? form.weekdays.filter((value) => value !== day) : [...form.weekdays, day])}>
+                      <Text numberOfLines={1} adjustsFontSizeToFit textBreakStrategy="simple" style={styles.buttonText}>{days[day]}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            ))}
           </View>
         </View>
       </>}
@@ -255,5 +260,7 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.48 },
   error: { color: Colors.red, marginBottom: 8 },
   capitalize: { color: Colors.secondary, textTransform: 'capitalize' },
-  day: { minHeight: 44, minWidth: 44, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9 },
+  weekdays: { gap: 7 },
+  weekdayRow: { flexDirection: 'row', gap: 7 },
+  day: { flex: 1, minHeight: 44, minWidth: 0, paddingHorizontal: 4, justifyContent: 'center', borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9 },
 });
