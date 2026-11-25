@@ -26,6 +26,7 @@ export default function Layout() {
               headerTitleStyle: { fontWeight: '600' },
               headerTitleAlign: 'center',
               headerShadowVisible: false,
+              navigationBarHidden: true,
               contentStyle: { backgroundColor: Colors.dark },
               animation: 'slide_from_right',
             }}
