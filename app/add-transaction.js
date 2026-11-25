@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { Toast } from '../components/Toast';
+import ActionLabel from '../components/ActionLabel';
 import Colors from '../constants/colors';
 import TransactionCategoryPicker from '../components/TransactionCategoryPicker';
 import TransactionCalendar from '../components/TransactionCalendar';
@@ -276,6 +277,7 @@ export default function AddTransactionScreen() {
         />
 
         <TouchableOpacity
+          accessibilityRole="button"
           style={[formStyles.submit, loading && formStyles.submitDisabled]}
           onPress={handleSubmit}
           activeOpacity={0.8}
@@ -283,9 +285,9 @@ export default function AddTransactionScreen() {
         >
           {loading
             ? <ActivityIndicator color={Colors.dark} size="small" />
-            : <Text style={formStyles.submitText} numberOfLines={1} adjustsFontSizeToFit>
+            : <ActionLabel style={formStyles.submitText}>
               {isEdit ? 'Save Changes' : 'Add Transaction'}
-            </Text>
+            </ActionLabel>
           }
         </TouchableOpacity>
       </ScrollView>

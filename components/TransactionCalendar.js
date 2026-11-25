@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Modal, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
+import ActionLabel from './ActionLabel';
 import { transactionFormStyles } from './TransactionFormFields';
 
 const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -70,14 +71,14 @@ export default function TransactionCalendar({ value, onChange, label = 'Date', m
               <View style={styles.modalActionsRow}>
                 <TouchableOpacity accessibilityRole="button" style={[styles.modalSecondaryBtn, !withinRange(new Date()) && styles.disabled]}
                   disabled={!withinRange(new Date())} onPress={() => setDraft(new Date())}>
-                  <Text style={styles.modalSecondaryBtnText}>Today</Text>
+                  <ActionLabel style={styles.modalSecondaryBtnText}>Today</ActionLabel>
                 </TouchableOpacity>
                 <TouchableOpacity accessibilityRole="button" style={styles.modalSecondaryBtn} onPress={() => setDraft(null)}>
-                  <Text style={styles.modalSecondaryBtnText}>Cancel</Text>
+                  <ActionLabel style={styles.modalSecondaryBtnText}>Cancel</ActionLabel>
                 </TouchableOpacity>
                 <TouchableOpacity accessibilityRole="button" style={[styles.modalPrimaryBtn, !withinRange(draft) && styles.disabled]}
                   disabled={!withinRange(draft)} onPress={() => { onChange(draft); setDraft(null); }}>
-                  <Text style={styles.modalPrimaryBtnText}>Apply</Text>
+                  <ActionLabel style={styles.modalPrimaryBtnText}>Apply</ActionLabel>
                 </TouchableOpacity>
               </View>
             </Pressable>
@@ -180,10 +181,13 @@ const styles = StyleSheet.create({
   },
   modalActionsRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     justifyContent: 'flex-end',
     gap: 8,
   },
   modalSecondaryBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
     borderColor: Colors.secondary,
     borderWidth: 1,
     borderRadius: 8,
@@ -196,6 +200,8 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   modalPrimaryBtn: {
+    minHeight: 44,
+    justifyContent: 'center',
     borderColor: Colors.primary,
     borderWidth: 1,
     borderRadius: 8,

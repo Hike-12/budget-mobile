@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, BackHandler, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
+import ActionLabel from './ActionLabel';
 import TransactionCategoryPicker from './TransactionCategoryPicker';
 import TransactionCalendar, { calendarDateKey } from './TransactionCalendar';
 import { transactionFormStyles as formStyles, transactionPlaceholderColor, TransactionTypeField } from './TransactionFormFields';
@@ -15,16 +16,16 @@ const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR
 const dateLabel = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' });
 const makeRequestId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-function Button({ label, onPress, primary, disabled, icon, roomy }) {
+function Button({ label, onPress, primary, disabled, icon, roomy, fullWidth }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!disabled }}
+    <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled }}
       disabled={disabled} onPress={onPress}
-      style={({ pressed }) => [styles.button, roomy && styles.roomyButton, primary && styles.primary,
+      style={({ pressed }) => [styles.button, fullWidth && styles.fullWidth, roomy && styles.roomyButton, primary && styles.primary,
         pressed && styles.pressed, disabled && styles.disabled]}>
-      <View style={styles.buttonContent}>
-        {icon && <Ionicons name={icon} size={17} color={primary ? Colors.dark : Colors.secondary} />}
-        <Text style={[styles.buttonText, primary && styles.primaryText]}>{label}</Text>
-      </View>
+      <ActionLabel style={[styles.buttonText, primary && styles.primaryText]}>
+        {icon && <><Ionicons name={icon} size={17} color={primary ? Colors.dark : Colors.secondary} />{'  '}</>}
+        {label}
+      </ActionLabel>
     </Pressable>
   );
 }
@@ -83,12 +84,12 @@ function RuleEditor({ initial, kind, today, busy, error, onSave, onCancel }) {
       <TouchableOpacity accessibilityRole="button" disabled={busy || !canSave}
         style={[formStyles.submit, (busy || !canSave) && formStyles.submitDisabled]}
         onPress={() => onSave({ ...form, kind, amount })}>
-        {busy ? <ActivityIndicator color={Colors.dark} /> : <Text style={formStyles.submitText}>
+        {busy ? <ActivityIndicator color={Colors.dark} /> : <ActionLabel style={formStyles.submitText}>
           {initial ? 'Save Changes' : recurring ? 'Save Schedule' : 'Save Quick Transaction'}
-        </Text>}
+        </ActionLabel>}
       </TouchableOpacity>
       <TouchableOpacity accessibilityRole="button" style={formStyles.cancel} disabled={busy} onPress={onCancel}>
-        <Text style={formStyles.cancelText}>Cancel</Text>
+        <ActionLabel style={formStyles.cancelText}>Cancel</ActionLabel>
       </TouchableOpacity>
     </>
   );
@@ -182,7 +183,7 @@ export default function TransactionRulesScreen({ kind }) {
             error={error && (error.response?.data?.error || 'Could not connect. Try again.')} onCancel={closeEditor} />}
           {!editor && data && <>
             {!data.rules.length && <Text style={styles.title}>{recurring ? 'No schedules yet' : 'No quick transactions yet'}</Text>}
-            <Button label={newLabel} icon="add" primary roomy={!recurring} disabled={!!active} onPress={() => { setEditor({}); setRemove(null); setNotice(''); }} />
+            <Button label={newLabel} icon="add" primary fullWidth roomy={!recurring} disabled={!!active} onPress={() => { setEditor({}); setRemove(null); setNotice(''); }} />
             {data.rules.map((rule) => (
               <View key={rule._id} style={[styles.card, !recurring && styles.quickCard]}>
                 <View style={styles.summary}>
@@ -243,12 +244,12 @@ const styles = StyleSheet.create({
   hint: { color: Colors.secondary, fontSize: 14, lineHeight: 20 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
   quickActions: { alignItems: 'center', gap: 10 },
-  button: { minHeight: 46, paddingHorizontal: 13, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  button: { minHeight: 46, minWidth: 88, maxWidth: '100%', paddingHorizontal: 13, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9, justifyContent: 'center' },
+  fullWidth: { width: '100%' },
   roomyButton: { minHeight: 52, paddingHorizontal: 17, paddingVertical: 11 },
-  buttonContent: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
   primary: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   selected: { backgroundColor: '#25384b', borderColor: Colors.primary },
-  buttonText: { color: Colors.accent, fontWeight: '600', fontSize: 14, flexShrink: 1, textAlign: 'center' },
+  buttonText: { color: Colors.accent, fontWeight: '600', fontSize: 14, textAlign: 'center' },
   primaryText: { color: Colors.dark },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.48 },

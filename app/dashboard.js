@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import BudgetCard from '../components/BudgetCard';
+import ActionLabel from '../components/ActionLabel';
 import FilterBar from '../components/FilterBar';
 import { Toast } from '../components/Toast';
 import TotalBalance from '../components/TotalBalance';
@@ -227,13 +228,11 @@ export default function DashboardScreen() {
       <View style={styles.addActions}>
         <TouchableOpacity style={[styles.transactionAction, styles.addButton]} onPress={() => router.push('/add-transaction')}
           accessibilityRole="button" accessibilityLabel="Add transaction" activeOpacity={0.8}>
-          <Ionicons name="add" size={19} color={Colors.dark} />
-          <Text style={styles.addButtonText}>Add Transaction</Text>
+          <ActionLabel style={styles.addButtonText}><Ionicons name="add" size={19} color={Colors.dark} />{'  '}Add Transaction</ActionLabel>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.transactionAction, styles.quickButton]} onPress={() => router.push('/quick-transactions')}
-          accessibilityRole="button" activeOpacity={0.8}>
-          <Ionicons name="flash-outline" size={17} color={Colors.secondary} />
-          <Text style={styles.quickButtonText}>Quick add</Text>
+          accessibilityRole="button" accessibilityLabel="Quick add" activeOpacity={0.8}>
+          <ActionLabel style={styles.quickButtonText}><Ionicons name="flash-outline" size={17} color={Colors.secondary} />{'  '}Quick add</ActionLabel>
         </TouchableOpacity>
       </View>
 
@@ -408,23 +407,19 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 12,
     borderRadius: 10,
-    flexDirection: 'row',
     justifyContent: 'center',
-    alignItems: 'center',
     flex: 1,
+    minWidth: 0,
     borderWidth: 1,
-    gap: 6,
   },
   addButton: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   addButtonText: {
     color: Colors.dark,
     fontWeight: '600',
     fontSize: 15,
-    flexShrink: 1,
-    textAlign: 'center',
   },
   quickButton: { borderColor: Colors.borderLight },
-  quickButtonText: { color: Colors.accent, fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'center' },
+  quickButtonText: { color: Colors.accent, fontSize: 15, fontWeight: '600' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

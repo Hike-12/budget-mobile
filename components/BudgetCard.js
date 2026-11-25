@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
 import DeleteModal from './DeleteModal';
+import ActionLabel from './ActionLabel';
 
 // Pre-compute date format options once (avoids object allocation per render)
 const DATE_FORMAT_OPTIONS = { day: 'numeric', month: 'short', year: 'numeric' };
@@ -60,11 +61,11 @@ const BudgetCard = React.memo(function BudgetCard({ budget, onDelete, onEdit }) 
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={1}>{budget.title}</Text>
         <View style={styles.actions}>
-          <TouchableOpacity onPress={handleEdit} hitSlop={8} activeOpacity={0.7}>
-            <Text style={styles.editButton}>Edit</Text>
+          <TouchableOpacity accessibilityRole="button" onPress={handleEdit} hitSlop={8} activeOpacity={0.7}>
+            <ActionLabel style={styles.editButton}>Edit</ActionLabel>
           </TouchableOpacity>
-          <TouchableOpacity onPress={openModal} hitSlop={8} activeOpacity={0.7}>
-            <Text style={styles.deleteButton}>Delete</Text>
+          <TouchableOpacity accessibilityRole="button" onPress={openModal} hitSlop={8} activeOpacity={0.7}>
+            <ActionLabel style={styles.deleteButton}>Delete</ActionLabel>
           </TouchableOpacity>
         </View>
       </View>
@@ -117,6 +118,8 @@ const styles = StyleSheet.create({
   },
   actions: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     gap: 12,
   },
   editButton: {

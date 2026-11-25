@@ -7,6 +7,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Colors from '../constants/colors';
+import ActionLabel from '../components/ActionLabel';
 import { useCaptureSession } from '../contexts/UpiCaptureContext';
 import { parsePaymentAlert } from '../utils/smsParser';
 import { upiNative } from '../utils/upiNative';
@@ -123,12 +124,12 @@ export default function SettingsScreen() {
             <View style={styles.editorActions}>
               <Pressable accessibilityRole="button" disabled={!!work} style={styles.secondaryButton}
                 onPress={() => { Keyboard.dismiss(); setEditingReceipt(false); setNotice(''); }}>
-                <Text style={styles.secondaryText}>Cancel</Text>
+                <ActionLabel style={styles.secondaryText}>Cancel</ActionLabel>
               </Pressable>
               <Pressable accessibilityRole="button" disabled={disabled || !receipt.trim()}
                 onPress={() => run('paste', addReceipt)}
                 style={[styles.primaryButton, (disabled || !receipt.trim()) && styles.disabled]}>
-                <Text style={styles.primaryText}>{work === 'paste' ? 'Saving…' : 'Add to review'}</Text>
+                <ActionLabel style={styles.primaryText}>{work === 'paste' ? 'Saving…' : 'Add to review'}</ActionLabel>
               </Pressable>
             </View>
           </View>

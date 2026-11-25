@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Platform, Pressable, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Colors from '../constants/colors';
+import ActionLabel from './ActionLabel';
 
 const DeleteModal = React.memo(function DeleteModal({ visible, onCancel, onDelete, title }) {
     return (
@@ -20,24 +21,21 @@ const DeleteModal = React.memo(function DeleteModal({ visible, onCancel, onDelet
 
                         <View style={styles.buttonContainer}>
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 style={[styles.button, styles.cancelButton]}
                                 onPress={onCancel}
                                 activeOpacity={0.7}
                             >
-                                <Text style={styles.cancelButtonText}>Cancel</Text>
+                                <ActionLabel style={styles.cancelButtonText}>Cancel</ActionLabel>
                             </TouchableOpacity>
 
                             <TouchableOpacity
+                                accessibilityRole="button"
                                 style={[styles.button, styles.deleteButton]}
                                 onPress={onDelete}
                                 activeOpacity={0.7}
                             >
-                                <Text style={styles.deleteButtonText} 
-                                    numberOfLines={1}
-                                    adjustsFontSizeToFit
-                                >
-                                    Delete
-                                </Text>
+                                <ActionLabel style={styles.deleteButtonText}>Delete</ActionLabel>
                             </TouchableOpacity>
                         </View>
                     </Pressable>
@@ -97,7 +95,9 @@ const styles = StyleSheet.create({
     },
     button: {
         flex: 1,
+        minHeight: 44,
         paddingVertical: 12,
+        paddingHorizontal: 8,
         borderRadius: 10,
         alignItems: 'center',
         justifyContent: 'center',
