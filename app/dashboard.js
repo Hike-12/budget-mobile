@@ -14,7 +14,6 @@ import {
   View,
 } from 'react-native';
 import BudgetCard from '../components/BudgetCard';
-import ActionLabel from '../components/ActionLabel';
 import FilterBar from '../components/FilterBar';
 import { Toast } from '../components/Toast';
 import TotalBalance from '../components/TotalBalance';
@@ -228,13 +227,17 @@ export default function DashboardScreen() {
       <View style={styles.addActions}>
         <TouchableOpacity style={[styles.transactionAction, styles.addButton]} onPress={() => router.push('/add-transaction')}
           accessibilityRole="button" accessibilityLabel="Add transaction" activeOpacity={0.8}>
-          <Ionicons name="add" size={19} color={Colors.dark} accessible={false} />
-          <ActionLabel style={styles.addButtonText}>Add Transaction</ActionLabel>
+          <Ionicons name="add" size={16} color={Colors.dark} accessible={false} />
+          <Text numberOfLines={1} adjustsFontSizeToFit textBreakStrategy="simple" style={[styles.actionText, styles.addButtonText]}>
+            Add Transaction
+          </Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.transactionAction, styles.quickButton]} onPress={() => router.push('/quick-transactions')}
           accessibilityRole="button" accessibilityLabel="Quick add" activeOpacity={0.8}>
-          <Ionicons name="flash-outline" size={19} color={Colors.secondary} accessible={false} />
-          <ActionLabel style={styles.quickButtonText}>Quick add</ActionLabel>
+          <Ionicons name="flash-outline" size={16} color={Colors.secondary} accessible={false} />
+          <Text numberOfLines={1} adjustsFontSizeToFit textBreakStrategy="simple" style={styles.actionText}>
+            Quick add
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -373,7 +376,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.warning,
     borderWidth: 1,
     borderRadius: 8,
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     marginBottom: 12,
     alignItems: 'center',
@@ -411,19 +414,22 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 2,
+    flexDirection: 'row',
+    gap: 5,
     flex: 1,
     minWidth: 0,
     borderWidth: 1,
   },
   addButton: { backgroundColor: Colors.primary, borderColor: Colors.primary },
-  addButtonText: {
-    color: Colors.dark,
+  actionText: {
+    color: Colors.accent,
+    flexShrink: 1,
     fontWeight: '600',
-    fontSize: 15,
+    fontSize: 14,
+    includeFontPadding: false,
   },
+  addButtonText: { color: Colors.dark },
   quickButton: { borderColor: Colors.borderLight },
-  quickButtonText: { color: Colors.accent, fontSize: 15, fontWeight: '600' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
