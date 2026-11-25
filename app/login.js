@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
 import axios from 'axios';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
@@ -46,6 +46,8 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
+  const { next } = useLocalSearchParams();
+  const destination = next === '/quick-transactions' || next === '/recurring-transactions' ? next : '/dashboard';
 
   const handleLogin = useCallback(async () => {
     if (!username.trim() || !password.trim()) {
@@ -65,17 +67,22 @@ export default function LoginScreen() {
           const normalizedUsername = normalizeUsername(res.data.username);
           await AsyncStorage.setItem('username', normalizedUsername);
           await AsyncStorage.setItem('password', password);
+          if (res.data.sessionToken) await AsyncStorage.setItem('accountSession', res.data.sessionToken);
+          else await AsyncStorage.removeItem('accountSession');
 
           // Do not block login if fetching budgets fails; keep cached data for resilience.
           try {
-            const budgetsRes = await axios.get(`${API_URL}/api/budgets?user=${normalizedUsername}`);
+            const budgetsRes = await axios.get(`${API_URL}/api/budgets`, {
+              params: { user: normalizedUsername },
+              headers: res.data.sessionToken ? { Authorization: `Bearer ${res.data.sessionToken}` } : {},
+            });
             await AsyncStorage.setItem('budgets', JSON.stringify(budgetsRes.data));
           } catch {
             // Keep previous cached budgets when fetch fails.
           }
 
           Toast.show({ message: 'Welcome back!', type: 'success' });
-          router.replace('/dashboard');
+          router.replace(destination);
         } else {
           Toast.show({ message: 'Invalid username or password.', type: 'error' });
         }
@@ -91,7 +98,7 @@ export default function LoginScreen() {
     } finally {
       setLoading(false);
     }
-  }, [username, password, router]);
+  }, [username, password, router, destination]);
 
   return (
     <KeyboardAvoidingView

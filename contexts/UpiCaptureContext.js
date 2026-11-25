@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import { useUpiCapture } from '../utils/useUpiCapture';
 
 const CaptureContext = createContext(null);
-const signedInRoutes = new Set(['/dashboard', '/settings', '/add-transaction']);
+const signedInRoutes = new Set(['/dashboard', '/settings', '/add-transaction', '/quick-transactions', '/recurring-transactions']);
 
 export function UpiCaptureProvider({ children }) {
   const signedInRoute = signedInRoutes.has(usePathname());

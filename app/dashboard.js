@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
-import { Stack, useRouter } from 'expo-router';
+import { Stack, useFocusEffect, useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -81,6 +81,10 @@ export default function DashboardScreen() {
   useEffect(() => {
     loadBudgetsLocal();
   }, [loadBudgetsLocal]);
+
+  useFocusEffect(useCallback(() => {
+    if (username) doSync();
+  }, [doSync, username]));
 
 
   const handleDelete = useCallback(async (id) => {
@@ -220,20 +224,18 @@ export default function DashboardScreen() {
         setFilterRange={setFilterRange}
       />
 
-      <TouchableOpacity
-        style={styles.addButton}
-        onPress={() => router.push('/add-transaction')}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={20} color={Colors.dark} style={styles.addButtonIcon} />
-        <Text
-          style={styles.addButtonText}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-        >
-          Add Transaction
-        </Text>
-      </TouchableOpacity>
+      <View style={styles.addActions}>
+        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/add-transaction')}
+          accessibilityRole="button" activeOpacity={0.8}>
+          <Ionicons name="add" size={19} color={Colors.dark} />
+          <Text style={styles.addButtonText} numberOfLines={1} adjustsFontSizeToFit>Add Transaction</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.quickButton} onPress={() => router.push('/quick-transactions')}
+          accessibilityRole="button" activeOpacity={0.8}>
+          <Ionicons name="flash-outline" size={17} color={Colors.secondary} />
+          <Text style={styles.quickButtonText} numberOfLines={1} adjustsFontSizeToFit>Quick add</Text>
+        </TouchableOpacity>
+      </View>
 
       {/* Search */}
       <View style={styles.searchContainer}>
@@ -400,28 +402,25 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 14,
   },
+  addActions: { flexDirection: 'row', gap: 8, marginVertical: 10 },
   addButton: {
     backgroundColor: Colors.primary,
-    padding: 15,
+    minHeight: 48,
+    paddingHorizontal: 12,
     borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginVertical: 10,
-    width: '100%',
-  },
-  addButtonIcon: {
-    position: 'absolute',
-    left: 15,
+    flex: 2,
+    gap: 4,
   },
   addButtonText: {
     color: Colors.dark,
     fontWeight: '600',
     fontSize: 15,
-    textAlign: 'center',
-    width: '100%',
-    paddingHorizontal: 40,
   },
+  quickButton: { flex: 1, minHeight: 48, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 10, borderWidth: 1, borderColor: Colors.borderLight },
+  quickButtonText: { color: Colors.accent, fontSize: 14, fontWeight: '600' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

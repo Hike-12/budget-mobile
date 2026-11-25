@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_URL } from '../constants/api';
 import { captureKey, merchantKey, parsePaymentAlert } from './smsParser';
+import { accountHeaders } from './transactionRules';
 
 /**
  * Adds a change to the unsynced queue, deduplicating by action+id.
@@ -77,7 +78,9 @@ async function _syncWithServerInner(user) {
     // Fetch current server state once — reused for dedup AND as the final truth
     let serverList;
     try {
-        serverList = (await axios.get(`${API_URL}/api/budgets?user=${normalizedUser}`)).data || [];
+        serverList = (await axios.get(`${API_URL}/api/budgets`, {
+            params: { user: normalizedUser }, headers: await accountHeaders(),
+        })).data || [];
     } catch {
         return null; // network issue — bail without losing queue
     }

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator, Keyboard, Pressable, ScrollView, StyleSheet, Switch,
@@ -28,6 +28,7 @@ function ActionRow({ icon, title, description, busy = false, disabled, onPress, 
 }
 
 export default function SettingsScreen() {
+  const router = useRouter();
   const { user, capture } = useCaptureSession();
   const [work, setWork] = useState(null);
   const [editingReceipt, setEditingReceipt] = useState(false);
@@ -72,7 +73,14 @@ export default function SettingsScreen() {
       <Stack.Screen options={{ title: 'Settings' }} />
       <ScrollView ref={scrollRef} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag" automaticallyAdjustKeyboardInsets>
-        <Text accessibilityRole="header" style={styles.section}>Payment alerts</Text>
+        <Text accessibilityRole="header" style={styles.section}>Transactions</Text>
+        <View style={styles.group}>
+          <ActionRow icon="flash-outline" title="Quick transactions" description="Save an entry you add often."
+            onPress={() => router.push('/quick-transactions')} />
+          <ActionRow icon="calendar-outline" title="Recurring transactions" description="Log entries on selected weekdays."
+            onPress={() => router.push('/recurring-transactions')} last />
+        </View>
+        <Text accessibilityRole="header" style={[styles.section, styles.nextSection]}>Payment alerts</Text>
         <View style={styles.group}>
           <View style={[styles.row, upiNative && capture.enabled && styles.divider]}>
             <Ionicons name="flash-outline" size={22} color={Colors.secondary} />
