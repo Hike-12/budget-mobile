@@ -228,7 +228,7 @@ export default function DashboardScreen() {
         <TouchableOpacity style={[styles.transactionAction, styles.addButton]} onPress={() => router.push('/add-transaction')}
           accessibilityRole="button" accessibilityLabel="Add transaction" activeOpacity={0.8}>
           <Ionicons name="add" size={19} color={Colors.dark} />
-          <Text style={styles.addButtonText}>Add</Text>
+          <Text style={styles.addButtonText}>Add Transaction</Text>
         </TouchableOpacity>
         <TouchableOpacity style={[styles.transactionAction, styles.quickButton]} onPress={() => router.push('/quick-transactions')}
           accessibilityRole="button" activeOpacity={0.8}>

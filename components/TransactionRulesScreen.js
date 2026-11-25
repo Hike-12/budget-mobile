@@ -97,7 +97,7 @@ function RuleEditor({ initial, kind, today, busy, error, onSave, onCancel }) {
 export default function TransactionRulesScreen({ kind }) {
   const recurring = kind === 'recurring';
   const title = recurring ? 'Recurring transactions' : 'Quick transactions';
-  const newLabel = recurring ? 'New schedule' : 'New quick transaction';
+  const newLabel = recurring ? 'New transaction' : 'New quick transaction';
   const router = useRouter();
   const [data, setData] = useState(null);
   const [editor, setEditor] = useState(null);
