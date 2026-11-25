@@ -11,6 +11,7 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import BudgetCard from '../components/BudgetCard';
@@ -44,6 +45,8 @@ export default function DashboardScreen() {
   const refreshCapture = capture.refresh;
   const pendingCount = username ? capture.items.length : 0;
   const router = useRouter();
+  const { width, fontScale } = useWindowDimensions();
+  const stackAddActions = width < 350 || fontScale >= 1.35;
   const { privacyMode, togglePrivacy } = usePrivacy();
 
   // --- Debounce search ---
@@ -224,16 +227,16 @@ export default function DashboardScreen() {
         setFilterRange={setFilterRange}
       />
 
-      <View style={styles.addActions}>
-        <TouchableOpacity style={styles.addButton} onPress={() => router.push('/add-transaction')}
+      <View style={[styles.addActions, stackAddActions && styles.stackedAddActions]}>
+        <TouchableOpacity style={[styles.addButton, stackAddActions && styles.stackedAddButton]} onPress={() => router.push('/add-transaction')}
           accessibilityRole="button" activeOpacity={0.8}>
           <Ionicons name="add" size={19} color={Colors.dark} />
-          <Text style={styles.addButtonText} numberOfLines={1} adjustsFontSizeToFit>Add Transaction</Text>
+          <Text style={styles.addButtonText}>Add Transaction</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.quickButton} onPress={() => router.push('/quick-transactions')}
+        <TouchableOpacity style={[styles.quickButton, stackAddActions && styles.stackedAddButton]} onPress={() => router.push('/quick-transactions')}
           accessibilityRole="button" activeOpacity={0.8}>
           <Ionicons name="flash-outline" size={17} color={Colors.secondary} />
-          <Text style={styles.quickButtonText} numberOfLines={1} adjustsFontSizeToFit>Quick add</Text>
+          <Text style={styles.quickButtonText}>Quick add</Text>
         </TouchableOpacity>
       </View>
 
@@ -258,7 +261,7 @@ export default function DashboardScreen() {
         </View>
       )}
     </>
-  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router, pendingCount]);
+  ), [isOnline, filteredBudgets, searchQuery, filterType, filterCategory, filterMonth, filterYear, filterRange, filteredCount, router, pendingCount, stackAddActions]);
 
   const listFooter = useMemo(() => {
     if (filteredCount === 0) return null;
@@ -402,25 +405,30 @@ const styles = StyleSheet.create({
     color: Colors.accent,
     fontSize: 14,
   },
-  addActions: { flexDirection: 'row', gap: 8, marginVertical: 10 },
+  addActions: { flexDirection: 'row', gap: 12, marginVertical: 14 },
+  stackedAddActions: { flexDirection: 'column', gap: 10 },
   addButton: {
     backgroundColor: Colors.primary,
-    minHeight: 48,
-    paddingHorizontal: 12,
+    minHeight: 54,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
     borderRadius: 10,
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    flex: 2,
-    gap: 4,
+    flex: 1.22,
+    gap: 7,
   },
   addButtonText: {
     color: Colors.dark,
     fontWeight: '600',
     fontSize: 15,
+    flexShrink: 1,
+    textAlign: 'center',
   },
-  quickButton: { flex: 1, minHeight: 48, paddingHorizontal: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: 10, borderWidth: 1, borderColor: Colors.borderLight },
-  quickButtonText: { color: Colors.accent, fontSize: 14, fontWeight: '600' },
+  quickButton: { flex: 1, minHeight: 54, paddingHorizontal: 14, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 10, borderWidth: 1, borderColor: Colors.borderLight },
+  stackedAddButton: { flex: 0 },
+  quickButtonText: { color: Colors.accent, fontSize: 15, fontWeight: '600', flexShrink: 1, textAlign: 'center' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

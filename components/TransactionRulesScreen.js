@@ -13,11 +13,11 @@ const money = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR
 const dateLabel = new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeZone: 'UTC' });
 const makeRequestId = () => `${Date.now()}-${Math.random().toString(36).slice(2)}`;
 
-function Button({ label, onPress, primary, disabled, icon, selected }) {
+function Button({ label, onPress, primary, disabled, icon, selected, roomy }) {
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ disabled: !!disabled, selected }}
       disabled={disabled} onPress={onPress}
-      style={({ pressed }) => [styles.button, primary && styles.primary, selected && styles.selected,
+      style={({ pressed }) => [styles.button, roomy && styles.roomyButton, primary && styles.primary, selected && styles.selected,
         pressed && styles.pressed, disabled && styles.disabled]}>
       {icon && <Ionicons name={icon} size={17} color={primary ? Colors.dark : Colors.secondary} />}
       <Text style={[styles.buttonText, primary && styles.primaryText]}>{label}</Text>
@@ -157,7 +157,7 @@ export default function TransactionRulesScreen({ kind }) {
     <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.screen}>
       <Stack.Screen options={{ title: editor ? (editor._id ? 'Edit transaction setup' : newLabel) : title }} />
       <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <ScrollView contentContainerStyle={[styles.content, !recurring && styles.quickContent]} keyboardShouldPersistTaps="handled">
           {!editor && <Text style={styles.hint}>{recurring ? 'Log entries automatically on the days you choose. Dates use India time.' : 'Save the details once, then add the transaction in one tap.'}</Text>}
           {!!notice && <Text accessibilityLiveRegion="polite" style={styles.hint}>{notice}</Text>}
           {!!error && <View style={styles.card}>
@@ -173,9 +173,9 @@ export default function TransactionRulesScreen({ kind }) {
             onCancel={() => { setEditor(null); setError(null); }} />}
           {!editor && data && <>
             {!data.rules.length && <Text style={styles.title}>{recurring ? 'No schedules yet' : 'No quick transactions yet'}</Text>}
-            <Button label={newLabel} icon="add" primary disabled={!!active} onPress={() => { setEditor({}); setRemove(null); setNotice(''); }} />
+            <Button label={newLabel} icon="add" primary roomy={!recurring} disabled={!!active} onPress={() => { setEditor({}); setRemove(null); setNotice(''); }} />
             {data.rules.map((rule) => (
-              <View key={rule._id} style={styles.card}>
+              <View key={rule._id} style={[styles.card, !recurring && styles.quickCard]}>
                 <View style={styles.summary}>
                   <View style={styles.name}>
                     <Text style={styles.title}>{rule.title}</Text>
@@ -197,9 +197,9 @@ export default function TransactionRulesScreen({ kind }) {
                     })} />
                     <Button label="Cancel" disabled={!!active} onPress={() => setRemove(null)} />
                   </View>
-                </> : <View style={styles.actions}>
+                </> : <View style={[styles.actions, !recurring && styles.quickActions]}>
                   {recurring ? <Button label={rule.paused ? 'Resume' : 'Pause'} disabled={!!active} onPress={() => save({ ...rule, paused: !rule.paused }, rule._id)} />
-                    : <Button label={active === rule._id ? 'Adding…' : 'Add now'} primary disabled={!!active} onPress={() => {
+                    : <Button label={active === rule._id ? 'Adding…' : 'Add now'} primary roomy disabled={!!active} onPress={() => {
                       const id = rule._id;
                       const requestId = requestIds.current[id] ??= makeRequestId();
                       act(id, { action: 'add', id, requestId }, () => {
@@ -223,6 +223,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: Colors.dark },
   content: { gap: 14, padding: 16, paddingBottom: 32, maxWidth: 680, alignSelf: 'center', width: '100%' },
   card: { backgroundColor: Colors.card, padding: 15, gap: 13, borderRadius: 16, borderWidth: 1, borderColor: Colors.borderLight },
+  quickContent: { gap: 18, paddingTop: 20 },
+  quickCard: { padding: 18, gap: 16 },
   summary: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 },
   name: { flex: 1, gap: 3 },
   title: { fontSize: 17, fontWeight: '700', color: Colors.accent },
@@ -230,10 +232,12 @@ const styles = StyleSheet.create({
   income: { color: Colors.green },
   hint: { color: Colors.secondary, fontSize: 14, lineHeight: 20 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  quickActions: { alignItems: 'center', gap: 10 },
   button: { minHeight: 46, paddingHorizontal: 13, paddingVertical: 8, borderWidth: 1, borderColor: Colors.borderLight, borderRadius: 9, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5 },
+  roomyButton: { minHeight: 52, paddingHorizontal: 17, paddingVertical: 11, gap: 7 },
   primary: { backgroundColor: Colors.primary, borderColor: Colors.primary },
   selected: { backgroundColor: '#25384b', borderColor: Colors.primary },
-  buttonText: { color: Colors.accent, fontWeight: '600', fontSize: 14 },
+  buttonText: { color: Colors.accent, fontWeight: '600', fontSize: 14, flexShrink: 1, textAlign: 'center' },
   primaryText: { color: Colors.dark },
   pressed: { opacity: 0.75 },
   disabled: { opacity: 0.48 },
