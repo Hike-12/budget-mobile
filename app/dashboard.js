@@ -17,18 +17,19 @@ import BudgetCard from '../components/BudgetCard';
 import FilterBar from '../components/FilterBar';
 import { Toast } from '../components/Toast';
 import TotalBalance from '../components/TotalBalance';
-import UpiCaptureControls, { PendingUpiBanner } from '../components/UpiCaptureControls';
-import { useUpiCapture } from '../utils/useUpiCapture';
+import { PendingUpiBanner } from '../components/PendingUpiBanner';
+import PendingVerifySheet from '../components/PendingVerifySheet';
+import { useCaptureSession } from '../contexts/UpiCaptureContext';
 import { PAGE_SIZE } from '../constants/api';
 import Colors from '../constants/colors';
 import { usePrivacy } from '../contexts/PrivacyContext';
-import { addToUnsyncedQueue, syncWithServer } from '../utils/sync';
+import { addToUnsyncedQueue, reviewPendingBudget, syncWithServer } from '../utils/sync';
 
 export default function DashboardScreen() {
   const [budgets, setBudgets] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [isOnline, setIsOnline] = useState(true);
-  const [username, setUsername] = useState(null);
+  const { user: username, capture } = useCaptureSession();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -38,11 +39,10 @@ export default function DashboardScreen() {
   const [filterYear, setFilterYear] = useState('All');
   const [filterRange, setFilterRange] = useState('all');
   const [page, setPage] = useState(1);
-  const [captureSheet, setCaptureSheet] = useState(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
 
-  const capture = useUpiCapture(username);
   const refreshCapture = capture.refresh;
-  const pendingCount = capture.items.length;
+  const pendingCount = username ? capture.items.length : 0;
   const router = useRouter();
   const { privacyMode, togglePrivacy } = usePrivacy();
 
@@ -80,7 +80,6 @@ export default function DashboardScreen() {
 
   useEffect(() => {
     loadBudgetsLocal();
-    AsyncStorage.getItem('username').then(u => setUsername(u || null));
   }, [loadBudgetsLocal]);
 
 
@@ -206,7 +205,7 @@ export default function DashboardScreen() {
       )}
 
       <TotalBalance budgets={filteredBudgets} />
-      <PendingUpiBanner count={pendingCount} onPress={() => setCaptureSheet('review')} />
+      <PendingUpiBanner count={pendingCount} onPress={() => setReviewOpen(true)} />
 
       <FilterBar
         filterType={filterType}
@@ -304,7 +303,7 @@ export default function DashboardScreen() {
                 />
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setCaptureSheet('settings')}
+                onPress={() => router.push('/settings')}
                 accessibilityRole="button"
                 accessibilityLabel="Settings"
                 hitSlop={12}
@@ -345,7 +344,14 @@ export default function DashboardScreen() {
         initialNumToRender={PAGE_SIZE}
         updateCellsBatchingPeriod={50}
       />
-      <UpiCaptureControls user={username} capture={capture} sheet={captureSheet} setSheet={setCaptureSheet} onVerified={doSync} />
+      {username && reviewOpen && (
+        <PendingVerifySheet visible items={capture.items} onClose={() => setReviewOpen(false)}
+          onReview={async (item, edit) => {
+            await reviewPendingBudget(username, item, edit);
+            capture.setItems(items => items.filter(row => row._id !== item._id));
+            if (edit) await doSync();
+          }} />
+      )}
     </>
   );
 }

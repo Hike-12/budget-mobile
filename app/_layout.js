@@ -5,6 +5,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ToastView, setToastRef } from "../components/Toast";
 import Colors from "../constants/colors";
 import { PrivacyProvider } from "../contexts/PrivacyContext";
+import { UpiCaptureProvider } from "../contexts/UpiCaptureContext";
 
 export default function Layout() {
   const toastRef = useRef(null);
@@ -17,17 +18,19 @@ export default function Layout() {
     <PrivacyProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>
         <StatusBar style="light" />
-        <Stack
-          screenOptions={{
-            headerStyle: { backgroundColor: Colors.dark },
-            headerTintColor: Colors.accent,
-            headerTitleStyle: { fontWeight: '600' },
-            headerTitleAlign: 'center',
-            headerShadowVisible: false,
-            contentStyle: { backgroundColor: Colors.dark },
-            animation: 'slide_from_right',
-          }}
-        />
+        <UpiCaptureProvider>
+          <Stack
+            screenOptions={{
+              headerStyle: { backgroundColor: Colors.dark },
+              headerTintColor: Colors.accent,
+              headerTitleStyle: { fontWeight: '600' },
+              headerTitleAlign: 'center',
+              headerShadowVisible: false,
+              contentStyle: { backgroundColor: Colors.dark },
+              animation: 'slide_from_right',
+            }}
+          />
+        </UpiCaptureProvider>
         <ToastView ref={toastRef} />
       </GestureHandlerRootView>
     </PrivacyProvider>

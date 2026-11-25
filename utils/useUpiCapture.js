@@ -4,9 +4,20 @@ import { AppState } from 'react-native';
 import { fetchPendingBudgets, flushUpiAlerts, stageUpiAlerts } from './sync';
 import { requestCaptureSms, requestInboxAccess, upiNative } from './upiNative';
 
+const EMPTY_ITEMS = [];
+
 export function useUpiCapture(user) {
     const [enabled, setEnabled] = useState(false);
-    const [items, setItems] = useState([]);
+    const [pending, setPending] = useState(null);
+    const items = pending && pending.user === user ? pending.items : EMPTY_ITEMS;
+    const setItems = useCallback(value => {
+        setPending(previous => ({
+            user,
+            items: typeof value === 'function'
+                ? value(previous && previous.user === user ? previous.items : EMPTY_ITEMS)
+                : value,
+        }));
+    }, [user]);
     const [notificationAccess, setNotificationAccess] = useState(false);
     const [message, setMessage] = useState('');
     const activeRefresh = useRef(null);
@@ -42,7 +53,7 @@ export function useUpiCapture(user) {
         });
         activeRefresh.current = { user, promise };
         return promise;
-    }, [user]);
+    }, [user, setItems]);
 
     useEffect(() => {
         if (!user) return;
